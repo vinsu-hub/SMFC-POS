@@ -108,6 +108,16 @@ export function fetchInventory(branchId: string): Promise<ApiIngredient[]> {
   return request(`/inventory?branch_id=${branchId}`);
 }
 
+export function submitInventoryCount(
+  ingredientId: string,
+  countedStock: number
+): Promise<ApiIngredient> {
+  return request(`/inventory/${ingredientId}/count`, {
+    method: 'POST',
+    body: JSON.stringify({ counted_stock: countedStock }),
+  });
+}
+
 export function createLossRecord(body: CreateLossRecordRequest): Promise<ApiLossRecord> {
   return request('/loss-records', {
     method: 'POST',

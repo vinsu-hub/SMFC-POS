@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,105 +6,65 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CheckCircle, Package } from 'lucide-react';
+import { AlertCircle, CheckCircle, Loader2, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
+import { ApiIngredient, fetchInventory, submitInventoryCount } from '@/lib/api';
 
-interface InventoryItem {
-  id: string;
-  name: string;
-  unit: string;
-  expectedStock: number;
-  countedStock: number | null;
-  variance: number | null;
-  variancePercent: number | null;
-  status: 'pending' | 'counted' | 'variance';
+type ItemStatus = 'pending' | 'counted' | 'variance';
+
+function computeStatus(expected: number, counted: number | null): ItemStatus {
+  if (counted === null) return 'pending';
+  const variancePercent = expected === 0 ? 0 : ((counted - expected) / expected) * 100;
+  return Math.abs(variancePercent) > 5 ? 'variance' : 'counted';
 }
 
 export default function InventoryCount() {
   const { user } = useAuth();
-  const [items, setItems] = useState<InventoryItem[]>([
-    {
-      id: '1',
-      name: 'Pork Pata',
-      unit: 'kg',
-      expectedStock: 12.5,
-      countedStock: null,
-      variance: null,
-      variancePercent: null,
-      status: 'pending',
-    },
-    {
-      id: '2',
-      name: 'Shrimp (Hipon)',
-      unit: 'kg',
-      expectedStock: 8.2,
-      countedStock: null,
-      variance: null,
-      variancePercent: null,
-      status: 'pending',
-    },
-    {
-      id: '3',
-      name: 'Kangkong',
-      unit: 'kg',
-      expectedStock: 6.0,
-      countedStock: null,
-      variance: null,
-      variancePercent: null,
-      status: 'pending',
-    },
-    {
-      id: '4',
-      name: 'Matcha Powder',
-      unit: 'g',
-      expectedStock: 500,
-      countedStock: null,
-      variance: null,
-      variancePercent: null,
-      status: 'pending',
-    },
-    {
-      id: '5',
-      name: 'Tanduay Rum',
-      unit: 'ml',
-      expectedStock: 1500,
-      countedStock: null,
-      variance: null,
-      variancePercent: null,
-      status: 'pending',
-    },
-  ]);
+  const [ingredients, setIngredients] = useState<ApiIngredient[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [countedValues, setCountedValues] = useState<Record<string, string>>({});
 
-  const updateCount = (id: string, count: number) => {
-    setItems(
-      items.map((item) => {
-        if (item.id === id) {
-          const variance = count - item.expectedStock;
-          const variancePercent = (variance / item.expectedStock) * 100;
-          return {
-            ...item,
-            countedStock: count,
-            variance,
-            variancePercent,
-            status: Math.abs(variancePercent) > 5 ? 'variance' : 'counted',
-          };
-        }
-        return item;
-      })
-    );
+  const loadInventory = () => {
+    if (!user?.branchId) return;
+    setLoading(true);
+    fetchInventory(user.branchId)
+      .then(setIngredients)
+      .catch(() => toast.error('Could not load inventory. Check your connection.'))
+      .finally(() => setLoading(false));
   };
 
-  const handleSubmit = () => {
-    const uncounted = items.filter((i) => i.countedStock === null);
-    if (uncounted.length > 0) {
-      toast.error(`Please count all items. ${uncounted.length} remaining.`);
+  useEffect(loadInventory, [user?.branchId]);
+
+  const updateCount = (id: string, value: string) => {
+    setCountedValues({ ...countedValues, [id]: value });
+  };
+
+  const handleSubmit = async () => {
+    const entries = Object.entries(countedValues).filter(([, v]) => v !== '' && !isNaN(parseFloat(v)));
+    if (entries.length < ingredients.length) {
+      toast.error(`Please count all items. ${ingredients.length - entries.length} remaining.`);
       return;
     }
-    toast.success('Inventory count submitted for approval');
+
+    setSubmitting(true);
+    try {
+      await Promise.all(
+        entries.map(([id, value]) => submitInventoryCount(id, parseFloat(value)))
+      );
+      toast.success('Inventory count saved. Stock levels updated.');
+      setCountedValues({});
+      loadInventory();
+    } catch (error) {
+      toast.error('Could not save the count. Try again.');
+      console.error(error);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: ItemStatus) => {
     switch (status) {
       case 'counted':
         return <CheckCircle className="w-4 h-4 text-green-600" />;
@@ -121,8 +81,26 @@ export default function InventoryCount() {
     return 'text-red-600';
   };
 
-  const countedItems = items.filter((i) => i.countedStock !== null).length;
-  const varianceItems = items.filter((i) => i.status === 'variance').length;
+  const rows = ingredients.map((ingredient) => {
+    const raw = countedValues[ingredient.id];
+    const counted = raw !== undefined && raw !== '' && !isNaN(parseFloat(raw)) ? parseFloat(raw) : null;
+    const variance = counted !== null ? counted - ingredient.current_stock : null;
+    const variancePercent =
+      counted !== null && ingredient.current_stock !== 0
+        ? (variance! / ingredient.current_stock) * 100
+        : counted !== null
+          ? 0
+          : null;
+    const status = computeStatus(ingredient.current_stock, counted);
+    return { ingredient, counted, variance, variancePercent, status };
+  });
+
+  const countedItems = rows.filter((r) => r.counted !== null).length;
+  const varianceItems = rows.filter((r) => r.status === 'variance').length;
+  const expectedTotalValue = ingredients.reduce(
+    (sum, i) => sum + i.current_stock * i.unit_cost,
+    0
+  );
 
   return (
     <DashboardLayout title="Inventory Count">
@@ -133,12 +111,14 @@ export default function InventoryCount() {
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-corp-body mb-1">Items Counted</p>
               <p className="text-3xl font-corp-display font-bold text-gray-900">
-                {countedItems}/{items.length}
+                {countedItems}/{ingredients.length}
               </p>
               <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
                 <div
                   className="bg-green-500 h-2 rounded-full transition-all"
-                  style={{ width: `${(countedItems / items.length) * 100}%` }}
+                  style={{
+                    width: `${ingredients.length ? (countedItems / ingredients.length) * 100 : 0}%`,
+                  }}
                 />
               </div>
             </CardContent>
@@ -158,9 +138,9 @@ export default function InventoryCount() {
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-corp-body mb-1">Expected Total Value</p>
               <p className="text-3xl font-corp-display font-bold text-gray-900">
-                {formatCurrency(items.reduce((sum, i) => sum + i.expectedStock * 220, 0))}
+                {formatCurrency(expectedTotalValue)}
               </p>
-              <p className="text-xs text-gray-500 mt-2">Estimated at ₱220/unit avg</p>
+              <p className="text-xs text-gray-500 mt-2">Based on each ingredient's unit cost</p>
             </CardContent>
           </Card>
         </div>
@@ -175,48 +155,58 @@ export default function InventoryCount() {
             <CardTitle className="font-corp-display">Stock Count</CardTitle>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Item</TableHead>
-                  <TableHead className="text-right">Expected</TableHead>
-                  <TableHead className="text-right">Counted</TableHead>
-                  <TableHead className="text-right">Variance</TableHead>
-                  <TableHead className="text-center">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-corp-body">{item.name}</TableCell>
-                    <TableCell className="text-right font-corp-mono">
-                      {item.expectedStock} {item.unit}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        value={item.countedStock ?? ''}
-                        onChange={(e) => updateCount(item.id, parseFloat(e.target.value))}
-                        className="w-24 text-right font-corp-mono text-sm"
-                      />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {item.variance !== null ? (
-                        <span className={`font-corp-mono font-semibold ${getVarianceColor(item.variancePercent)}`}>
-                          {item.variance > 0 ? '+' : ''}{item.variance.toFixed(1)} ({item.variancePercent?.toFixed(1)}%)
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {getStatusIcon(item.status)}
-                    </TableCell>
+            {loading ? (
+              <div className="flex items-center justify-center py-8 text-gray-500">
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Loading inventory...
+              </div>
+            ) : ingredients.length === 0 ? (
+              <p className="text-center text-gray-500 py-8 font-corp-body">
+                No ingredients set up for this branch yet.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Item</TableHead>
+                    <TableHead className="text-right">Expected</TableHead>
+                    <TableHead className="text-right">Counted</TableHead>
+                    <TableHead className="text-right">Variance</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {rows.map(({ ingredient, counted, variance, variancePercent, status }) => (
+                    <TableRow key={ingredient.id}>
+                      <TableCell className="font-corp-body">{ingredient.name}</TableCell>
+                      <TableCell className="text-right font-corp-mono">
+                        {ingredient.current_stock} {ingredient.unit}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={countedValues[ingredient.id] ?? ''}
+                          onChange={(e) => updateCount(ingredient.id, e.target.value)}
+                          className="w-24 text-right font-corp-mono text-sm"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {variance !== null ? (
+                          <span className={`font-corp-mono font-semibold ${getVarianceColor(variancePercent)}`}>
+                            {variance > 0 ? '+' : ''}
+                            {variance.toFixed(1)} ({variancePercent?.toFixed(1)}%)
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">{getStatusIcon(status)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
 
@@ -228,18 +218,22 @@ export default function InventoryCount() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {items
-                  .filter((i) => i.status === 'variance')
-                  .map((item) => (
-                    <div key={item.id} className="flex justify-between items-center p-3 bg-white rounded border border-red-200">
+                {rows
+                  .filter((r) => r.status === 'variance')
+                  .map(({ ingredient, counted, variancePercent }) => (
+                    <div
+                      key={ingredient.id}
+                      className="flex justify-between items-center p-3 bg-white rounded border border-red-200"
+                    >
                       <div>
-                        <p className="font-corp-body font-semibold text-gray-900">{item.name}</p>
+                        <p className="font-corp-body font-semibold text-gray-900">{ingredient.name}</p>
                         <p className="text-xs text-gray-500">
-                          Expected: {item.expectedStock} {item.unit} • Counted: {item.countedStock} {item.unit}
+                          Expected: {ingredient.current_stock} {ingredient.unit} • Counted: {counted}{' '}
+                          {ingredient.unit}
                         </p>
                       </div>
                       <Badge variant="destructive" className="text-sm">
-                        {item.variancePercent?.toFixed(1)}% diff
+                        {variancePercent?.toFixed(1)}% diff
                       </Badge>
                     </div>
                   ))}
@@ -251,10 +245,11 @@ export default function InventoryCount() {
         {/* Submit Button */}
         <Button
           onClick={handleSubmit}
-          disabled={countedItems < items.length}
+          disabled={submitting || ingredients.length === 0 || countedItems < ingredients.length}
           className="w-full bg-[#1B2A4A] hover:bg-[#13203A] font-corp-display py-6"
         >
-          Submit Inventory Count for Approval
+          {submitting ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
+          Save Inventory Count
         </Button>
       </div>
     </DashboardLayout>
