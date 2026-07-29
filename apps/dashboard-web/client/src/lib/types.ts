@@ -1,0 +1,193 @@
+/**
+ * Saint Michael Food Corp - Shared Types
+ * Defines data models for the multi-tenant POS platform
+ */
+
+export type Branch = 'danielito' | 'malaya' | 'dbar';
+export type Role = 'employee' | 'manager' | 'executive';
+
+export interface User {
+  id: string;
+  branchId: string | null;
+  name: string;
+  email: string;
+  branch: Branch;
+  role: Role;
+  avatar?: string;
+}
+
+export interface MenuItem {
+  id: string;
+  name: string;
+  description?: string;
+  price: number;
+  category: string;
+  branch: Branch;
+  recipe: RecipeItem[];
+  available: boolean;
+}
+
+export interface RecipeItem {
+  ingredientId: string;
+  ingredientName: string;
+  quantity: number;
+  unit: string;
+}
+
+export interface Ingredient {
+  id: string;
+  name: string;
+  unit: string;
+  branch: Branch;
+  currentStock: number;
+  expectedStock: number;
+  reorderLevel: number;
+  unitCost: number;
+}
+
+export interface Order {
+  id: string;
+  branch: Branch;
+  items: OrderItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  timestamp: Date;
+  employeeId: string;
+  status: 'pending' | 'completed' | 'cancelled';
+}
+
+export interface OrderItem {
+  menuItemId: string;
+  menuItemName: string;
+  quantity: number;
+  unitPrice: number;
+  modifiers?: string[];
+}
+
+export interface Loss {
+  id: string;
+  branch: Branch;
+  ingredientId: string;
+  ingredientName: string;
+  quantity: number;
+  unit: string;
+  reason: 'spoilage' | 'breakage' | 'comp' | 'prep_error' | 'other';
+  notes?: string;
+  photoUrl?: string;
+  timestamp: Date;
+  employeeId: string;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
+export interface InventoryCount {
+  id: string;
+  branch: Branch;
+  ingredientId: string;
+  ingredientName: string;
+  expectedQuantity: number;
+  countedQuantity: number;
+  variance: number;
+  variancePercent: number;
+  timestamp: Date;
+  employeeId: string;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
+export interface Shift {
+  id: string;
+  employeeId: string;
+  branch: Branch;
+  clockInTime: Date;
+  clockOutTime?: Date;
+  status: 'active' | 'completed';
+}
+
+export interface DailyMetrics {
+  branch: Branch;
+  date: Date;
+  unitsSOld: number;
+  revenue: number;
+  cogs: number;
+  losses: number;
+  margin: number;
+  marginPercent: number;
+}
+
+export interface BranchMetrics {
+  branch: Branch;
+  date: Date;
+  metrics: DailyMetrics;
+}
+
+export interface NewsItem {
+  id: string;
+  branch: Branch;
+  type: 'expiry' | 'low_stock' | 'hr' | 'general';
+  title: string;
+  message: string;
+  timestamp: Date;
+  read: boolean;
+}
+
+export interface HRFlag {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  branch: Branch;
+  flagType: 'lateness' | 'absence' | 'other';
+  description: string;
+  timestamp: Date;
+  resolved: boolean;
+}
+
+export interface TrendItem {
+  menuItemId: string;
+  menuItemName: string;
+  category: string;
+  trend: 'rising' | 'declining' | 'stable';
+  percentChange: number;
+  suggestion: string;
+  branch: Branch;
+}
+
+export interface SyncStatus {
+  status: 'synced' | 'syncing' | 'offline-queued';
+  lastSyncTime?: Date;
+  pendingChanges: number;
+}
+
+export const BRANCH_CONFIG = {
+  danielito: {
+    name: 'Danielito\'s Home Kitchen',
+    color: '#1F2E28',
+    accentColor: '#C9A24B',
+    displayFont: 'font-danielito-display',
+    bodyFont: 'font-danielito-body',
+    theme: 'light',
+  },
+  malaya: {
+    name: 'Malaya\'s Cafe',
+    color: '#6E8368',
+    accentColor: '#D9A441',
+    displayFont: 'font-malaya-display',
+    bodyFont: 'font-malaya-body',
+    theme: 'light',
+  },
+  dbar: {
+    name: 'D\' Bar',
+    color: '#B5651D',
+    accentColor: '#241726',
+    displayFont: 'font-dbar-display',
+    bodyFont: 'font-dbar-mono',
+    theme: 'dark',
+  },
+};
+
+export const LOSS_REASONS = [
+  { value: 'spoilage', label: 'Spoilage' },
+  { value: 'breakage', label: 'Breakage' },
+  { value: 'comp', label: 'Complimentary' },
+  { value: 'prep_error', label: 'Prep Error' },
+  { value: 'other', label: 'Other' },
+];
