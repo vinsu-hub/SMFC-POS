@@ -69,7 +69,7 @@ export function MalayaPanelDrawer() {
         <Button
           variant="outline"
           size="icon"
-          className="fixed bottom-6 right-6 rounded-full w-14 h-14 shadow-lg hover:shadow-xl transition-shadow bg-gradient-to-br from-[#6E8368] to-[#5A6F56] text-white border-0 hover:from-[#5A6F56] hover:to-[#4A5F46]"
+          className="fixed bottom-6 right-6 rounded-full w-14 h-14 shadow-lg hover:shadow-xl active:scale-[0.97] transition-[transform,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] bg-gradient-to-br from-[#1B2A4A] to-[#2E8B99] text-white border-0 hover:from-[#13203A] hover:to-[#25727D]"
           title="Malaya AI Assistant"
         >
           <Sparkles className="w-6 h-6" />
@@ -78,7 +78,7 @@ export function MalayaPanelDrawer() {
       <SheetContent side="right" className="w-full sm:w-96 p-0 flex flex-col">
         <SheetHeader className="p-4 border-b">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#6E8368] to-[#5A6F56] flex items-center justify-center text-white text-sm font-bold">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#1B2A4A] to-[#2E8B99] flex items-center justify-center text-white text-sm font-bold">
               M
             </div>
             <div>

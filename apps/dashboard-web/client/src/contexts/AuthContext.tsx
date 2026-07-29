@@ -30,7 +30,7 @@ async function loadUser(authUserId: string, email: string): Promise<User> {
     branchId: profile.branch_id,
     name: profile.full_name ?? email.split('@')[0],
     email,
-    branch: (branchRow?.theme_key ?? 'malaya') as Branch,
+    branch: (branchRow?.theme_key ?? null) as Branch | null,
     role: profile.role as Role,
     avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
   };

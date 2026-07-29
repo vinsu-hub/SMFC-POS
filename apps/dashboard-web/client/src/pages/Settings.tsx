@@ -29,7 +29,7 @@ export default function Settings() {
 
   // General Settings
   const [branchName, setBranchName] = useState(user?.branch === 'danielito' ? "Danielito's Home Kitchen" : user?.branch === 'malaya' ? "Malaya's Cafe" : "D' Bar");
-  const [branchPhone, setBranchPhone] = useState('+1 (555) 123-4567');
+  const [branchPhone, setBranchPhone] = useState('+63 917 123 4567');
   const [branchEmail, setBranchEmail] = useState('branch@saintmichael.com');
   const [operatingHours, setOperatingHours] = useState('11:00 AM - 11:00 PM');
 

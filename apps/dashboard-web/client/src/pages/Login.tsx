@@ -213,7 +213,7 @@ export default function Login() {
                   setExpandedBranch(expandedBranch === 'executive' ? null : 'executive')
                 }
                 className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
-                style={{ borderLeft: '4px solid #9C27B0' }}
+                style={{ borderLeft: '4px solid #2E8B99' }}
               >
                 <div className="text-left">
                   <p className="font-corp-display font-semibold text-gray-900 text-sm">
@@ -246,7 +246,7 @@ export default function Login() {
                           </p>
                           <code className="text-xs text-gray-600">{account.email}</code>
                         </div>
-                        <span className="text-xs font-corp-body px-2 py-1 bg-purple-100 rounded text-purple-700 capitalize">
+                        <span className="text-xs font-corp-body px-2 py-1 bg-[#2E8B99]/10 rounded text-[#1B2A4A] capitalize">
                           {account.role}
                         </span>
                       </div>

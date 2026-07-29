@@ -17,7 +17,9 @@ export function Header({ title, showLogo = true }: HeaderProps) {
 
   if (!user) return null;
 
-  const branchConfig = BRANCH_CONFIG[user.branch];
+  const branchConfig = user.branch
+    ? BRANCH_CONFIG[user.branch]
+    : { name: 'Corporate HQ', color: '#1B2A4A' };
 
   const getSyncDotColor = () => {
     switch (syncStatus.status) {
@@ -44,6 +46,7 @@ export function Header({ title, showLogo = true }: HeaderProps) {
               {user.branch === 'danielito' && 'D'}
               {user.branch === 'malaya' && 'M'}
               {user.branch === 'dbar' && 'B'}
+              {!user.branch && 'HQ'}
             </div>
           )}
           <div>
@@ -51,7 +54,7 @@ export function Header({ title, showLogo = true }: HeaderProps) {
               {title || branchConfig.name}
             </h1>
             <p className="text-xs text-gray-500 capitalize">
-              {user.role} • {user.branch}
+              {user.role} • {user.branch ?? 'All Venues'}
             </p>
           </div>
         </div>

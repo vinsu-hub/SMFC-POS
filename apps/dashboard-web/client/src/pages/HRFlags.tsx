@@ -18,11 +18,11 @@ export default function HRFlags() {
     );
   }
 
-  // Mock HR data
+  // Mock HR data (matches the seeded demo accounts in scripts/seed_demo.py)
   const staffRoster = [
     {
       id: '1',
-      name: 'John Smith',
+      name: 'Marco',
       branch: 'Danielito\'s',
       branchColor: '#1F2E28',
       status: 'on-time',
@@ -31,7 +31,7 @@ export default function HRFlags() {
     },
     {
       id: '2',
-      name: 'Maria Garcia',
+      name: 'Rosa',
       branch: 'Danielito\'s',
       branchColor: '#1F2E28',
       status: 'on-time',
@@ -40,7 +40,7 @@ export default function HRFlags() {
     },
     {
       id: '3',
-      name: 'James Wilson',
+      name: 'Javier',
       branch: 'Malaya\'s Cafe',
       branchColor: '#6E8368',
       status: 'late',
@@ -49,7 +49,7 @@ export default function HRFlags() {
     },
     {
       id: '4',
-      name: 'Sarah Chen',
+      name: 'Ana',
       branch: 'Malaya\'s Cafe',
       branchColor: '#6E8368',
       status: 'on-time',
@@ -58,7 +58,7 @@ export default function HRFlags() {
     },
     {
       id: '5',
-      name: 'Marcus Johnson',
+      name: 'Diego',
       branch: 'D\' Bar',
       branchColor: '#B5651D',
       status: 'absent',
@@ -67,7 +67,7 @@ export default function HRFlags() {
     },
     {
       id: '6',
-      name: 'Lisa Wong',
+      name: 'Carmen',
       branch: 'D\' Bar',
       branchColor: '#B5651D',
       status: 'on-time',
@@ -80,33 +80,33 @@ export default function HRFlags() {
     {
       id: '1',
       employeeId: '3',
-      employeeName: 'James Wilson',
+      employeeName: 'Javier',
       branch: 'Malaya\'s Cafe',
       branchColor: '#6E8368',
       flagType: 'lateness',
-      description: 'James has been late 3 times in the past 2 weeks. Pattern detected on Mondays and Fridays.',
+      description: 'Javier has been late 3 times in the past 2 weeks. Pattern detected on Mondays and Fridays.',
       timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
       resolved: false,
     },
     {
       id: '2',
       employeeId: '5',
-      employeeName: 'Marcus Johnson',
+      employeeName: 'Diego',
       branch: 'D\' Bar',
       branchColor: '#B5651D',
       flagType: 'absence',
-      description: 'Marcus has been absent 2 times this month. Recommend check-in conversation.',
+      description: 'Diego has been absent 2 times this month. Recommend check-in conversation.',
       timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000),
       resolved: false,
     },
     {
       id: '3',
       employeeId: '1',
-      employeeName: 'John Smith',
+      employeeName: 'Marco',
       branch: 'Danielito\'s',
       branchColor: '#1F2E28',
       flagType: 'lateness',
-      description: 'John was 5 minutes late today. First incident in 6 months. No action needed.',
+      description: 'Marco was 5 minutes late today. First incident in 6 months. No action needed.',
       timestamp: new Date(Date.now() - 60 * 60 * 1000),
       resolved: true,
     },

@@ -48,7 +48,7 @@ const POS_THEMES: Record<Branch, BranchPosTheme> = {
     tabsTriggerText: 'text-white',
     itemLayout: 'list',
     itemClass:
-      'w-full h-auto py-4 px-4 bg-white hover:bg-[#C9A24B] text-[#1F2E28] hover:text-white border-l-4 border-l-[#C9A24B] justify-between items-center font-danielito-display text-left transition-colors duration-200',
+      'w-full h-auto py-4 px-4 bg-white hover:bg-[#C9A24B] text-[#1F2E28] border-l-4 border-l-[#C9A24B] justify-between items-center font-danielito-display text-left transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]',
     itemNameClass: 'font-semibold',
     itemPriceClass: 'font-bold',
     ticketBg: 'bg-white',
@@ -62,7 +62,7 @@ const POS_THEMES: Record<Branch, BranchPosTheme> = {
     totalRowBg: 'bg-[#C9A24B]/20',
     totalRowText: 'font-danielito-display font-bold text-lg text-[#1F2E28]',
     checkoutBtn:
-      'bg-[#1F2E28] hover:bg-[#6B2E2E] text-white font-danielito-display transition-colors duration-200 active:scale-[0.98]',
+      'bg-[#1F2E28] hover:bg-[#6B2E2E] text-white font-danielito-display transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]',
     emptyText: 'text-gray-400 font-danielito-body',
     loadingText: 'text-[#1F2E28]',
   },
@@ -72,7 +72,7 @@ const POS_THEMES: Record<Branch, BranchPosTheme> = {
     tabsTriggerText: 'text-white',
     itemLayout: 'grid',
     itemClass:
-      'h-32 w-full flex-col items-start justify-between rounded-2xl bg-white hover:bg-[#D9A441] text-[#3C2E26] hover:text-white border border-[#D9A441]/40 p-4 font-malaya-display text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
+      'h-32 w-full flex-col items-start justify-between rounded-2xl bg-white hover:bg-[#D9A441] text-[#3C2E26] border border-[#D9A441]/40 p-4 font-malaya-display text-left shadow-sm transition-[background-color,transform,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-0.5 hover:shadow-md active:scale-[0.97] active:translate-y-0',
     itemNameClass: 'font-medium text-base leading-snug',
     itemPriceClass: 'font-semibold text-lg',
     ticketBg: 'bg-white',
@@ -86,7 +86,7 @@ const POS_THEMES: Record<Branch, BranchPosTheme> = {
     totalRowBg: 'bg-[#D9A441]/25',
     totalRowText: 'font-malaya-display font-semibold text-lg text-[#3C2E26]',
     checkoutBtn:
-      'bg-[#6E8368] hover:bg-[#3C2E26] text-white font-malaya-display transition-colors duration-200 active:scale-[0.98]',
+      'bg-[#6E8368] hover:bg-[#3C2E26] text-white font-malaya-display transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]',
     emptyText: 'text-[#6E8368]/60 font-malaya-body',
     loadingText: 'text-[#6E8368]',
   },
@@ -96,7 +96,7 @@ const POS_THEMES: Record<Branch, BranchPosTheme> = {
     tabsTriggerText: 'text-[#E9E2D9]',
     itemLayout: 'list',
     itemClass:
-      'w-full h-auto py-4 px-4 bg-[#2E1B31] hover:bg-[#B5651D] text-[#E9E2D9] border-l-4 border-l-[#B5651D] justify-between items-center font-dbar-display uppercase tracking-wide text-left transition-colors duration-200',
+      'w-full h-auto py-4 px-4 bg-[#2E1B31] hover:bg-[#40263F] text-[#E9E2D9] border-l-4 border-l-[#B5651D] hover:border-l-[#D97C2E] justify-between items-center font-dbar-display uppercase tracking-wide text-left transition-[background-color,border-color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]',
     itemNameClass: 'font-semibold',
     itemPriceClass: 'font-dbar-mono',
     ticketBg: 'bg-[#2E1B31]',
@@ -110,7 +110,7 @@ const POS_THEMES: Record<Branch, BranchPosTheme> = {
     totalRowBg: 'bg-[#B5651D]/25',
     totalRowText: 'font-dbar-display text-lg text-[#E9E2D9]',
     checkoutBtn:
-      'bg-[#B5651D] hover:bg-[#7A2E3B] text-white font-dbar-display uppercase tracking-wide transition-colors duration-200 active:scale-[0.98]',
+      'bg-[#B5651D] hover:bg-[#7A2E3B] text-white font-dbar-display uppercase tracking-wide transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]',
     emptyText: 'text-[#E9E2D9]/40 font-dbar-mono',
     loadingText: 'text-[#E9E2D9]',
   },
@@ -136,7 +136,7 @@ export default function POSTerminal() {
       .finally(() => setLoadingProducts(false));
   }, [user?.branchId]);
 
-  if (!user || user.role !== 'employee') {
+  if (!user || user.role !== 'employee' || !user.branch) {
     return (
       <DashboardLayout>
         <div className="p-6 text-center">

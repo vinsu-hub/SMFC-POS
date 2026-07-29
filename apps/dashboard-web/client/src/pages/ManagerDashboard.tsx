@@ -10,7 +10,7 @@ import { TrendingUp, TrendingDown, DollarSign, Package, AlertCircle } from 'luci
 export default function ManagerDashboard() {
   const { user } = useAuth();
 
-  if (!user || user.role !== 'manager') {
+  if (!user || user.role !== 'manager' || !user.branch) {
     return (
       <DashboardLayout>
         <div className="p-6 text-center">

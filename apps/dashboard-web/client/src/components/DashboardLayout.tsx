@@ -11,7 +11,7 @@ interface DashboardLayoutProps {
 }
 
 export function DashboardLayout({ children, title }: DashboardLayoutProps) {
-  const { isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
   const [, navigate] = useLocation();
 
   React.useEffect(() => {
@@ -44,7 +44,7 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
           {children}
         </main>
       </div>
-      <MalayaPanelDrawer />
+      {(user?.role === 'manager' || user?.role === 'executive') && <MalayaPanelDrawer />}
     </div>
   );
 }

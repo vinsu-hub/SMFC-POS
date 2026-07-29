@@ -153,7 +153,7 @@ export default function TrendAnalysis() {
                         }`}
                       >
                         {product.trend === 'rising' ? '+' : '-'}
-                        {product.change}%
+                        {Math.abs(product.change)}%
                       </span>
                     </div>
                   </div>

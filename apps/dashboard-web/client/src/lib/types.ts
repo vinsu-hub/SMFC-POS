@@ -11,7 +11,8 @@ export interface User {
   branchId: string | null;
   name: string;
   email: string;
-  branch: Branch;
+  /** null for executives, who aren't scoped to a single branch */
+  branch: Branch | null;
   role: Role;
   avatar?: string;
 }
