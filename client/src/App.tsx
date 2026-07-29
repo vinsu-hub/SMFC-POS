@@ -15,6 +15,8 @@ import CommandCenter from "./pages/CommandCenter";
 import TrendAnalysis from "./pages/TrendAnalysis";
 import HRFlags from "./pages/HRFlags";
 import Newsfeed from "./pages/Newsfeed";
+import InventoryCount from "./pages/InventoryCount";
+import LossLog from "./pages/LossLog";
 import NotFound from "./pages/NotFound";
 
 function Router() {
@@ -28,6 +30,8 @@ function Router() {
       <Route path={"/trends"} component={TrendAnalysis} />
       <Route path={"/hr-flags"} component={HRFlags} />
       <Route path={"/newsfeed"} component={Newsfeed} />
+      <Route path={"/inventory-count"} component={InventoryCount} />
+      <Route path={"/loss-log"} component={LossLog} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'wouter';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
+import { MalayaPanelDrawer } from '@/components/MalayaPanelDrawer';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -43,6 +44,7 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
           {children}
         </main>
       </div>
+      <MalayaPanelDrawer />
     </div>
   );
 }

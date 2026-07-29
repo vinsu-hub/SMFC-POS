@@ -14,6 +14,7 @@ import {
   Settings,
   Menu,
   X,
+  Bell,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -35,16 +36,16 @@ export function Sidebar() {
     ...(isEmployee
       ? [
           { icon: ShoppingCart, label: 'POS Terminal', href: '/pos', show: true },
-          { icon: Package, label: 'Inventory Count', href: '/inventory', show: true },
-          { icon: AlertCircle, label: 'Log Loss', href: '/loss', show: true },
+          { icon: Package, label: 'Count Stock', href: '/inventory-count', show: true },
+          { icon: AlertCircle, label: 'Log Loss', href: '/loss-log', show: true },
         ]
       : []),
     ...(isManager
       ? [
           { icon: BarChart3, label: 'EOD Dashboard', href: '/dashboard', show: true },
-          { icon: Package, label: 'Inventory', href: '/inventory', show: true },
+          { icon: Package, label: 'Inventory Count', href: '/inventory-count', show: true },
           { icon: AlertCircle, label: 'Loss Log', href: '/loss-log', show: true },
-          { icon: Users, label: 'Staff & Attendance', href: '/attendance', show: true },
+          { icon: Users, label: 'HR Flags', href: '/hr-flags', show: true },
           { icon: MessageSquare, label: 'Newsfeed', href: '/newsfeed', show: true },
         ]
       : []),
