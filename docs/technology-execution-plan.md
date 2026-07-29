@@ -19,9 +19,7 @@ The original proposal recommended a generic React/Node/PostgreSQL stack. This ve
 | **Supabase** (Postgres + Auth + Realtime + Storage) | SSA platform plan | Central database, role-based login, and live dashboard updates |
 | **GitHub → Vercel CI/CD** (push-to-deploy) | SSA platform | Version control for the dashboard codebase; every push to `main` auto-deploys, every branch/PR gets a preview URL |
 | **Laravel** | SSA platform | Available as an alternative CRUD backend if the team prefers PHP for admin-style screens |
-| **n8n** | Varix's core specialty, SSA platform | The automation layer — expiry alerts, low-stock pings, HR flags, EOD digest emails |
-| **Oracle Cloud Always Free ARM VM** | SSA platform | Hosts the backend + n8n at zero infrastructure cost |
-| **Vercel / Netlify** | SSA platform | Hosts the Manager/Executive web dashboards |
+| **Vercel / Netlify** | SSA platform | Hosts the Manager/Executive web dashboards, and (as built) the FastAPI backend too — see §5 |
 | **Zoho Mail (varixph.com) + Slack channels** | Varix ops | Delivery channels for automated alerts and the daily digest |
 | **iOS development capability** | Varix specialty | An Executive companion app for on-the-go glances and Malaya chat |
 | **Arduino / RFID / sensor integration** | eBALIK | Optional future hardware layer — see §6 |
@@ -38,7 +36,7 @@ Nothing here is a stretch. Every piece has already shipped in a Varix project th
 - **Executive Mobile Companion:** native iOS app — glance-view metrics plus a Malaya chat screen. Optional for MVP, natural Phase 5 addition given Varix already builds iOS.
 
 **Backend / API layer**
-- **FastAPI**, hosted on the Oracle Always Free VM. Chosen over Laravel here because it sits naturally next to the Python-based AI pipeline (Groq + ChromaDB) already used in Tessora and the thesis — one language across API and AI logic instead of two.
+- **FastAPI**, deployed on Vercel as a Python/ASGI serverless function (as built — see §5; this section originally assumed the Oracle Always Free VM). Chosen over Laravel here because it sits naturally next to the Python-based AI pipeline (Groq + ChromaDB) already used in Tessora and the thesis — one language across API and AI logic instead of two.
 - **Real-time sync:** Supabase Realtime (Postgres change streams) handles most live-update needs out of the box. Socket.IO — the exact pattern proven in eBALIK for pushing hardware-state changes to a dashboard — is kept in reserve for anything Supabase's realtime can't cover cleanly (e.g. POS-terminal-to-POS-terminal state like a shared bar tab).
 
 **Data layer**
@@ -52,19 +50,19 @@ Nothing here is a stretch. Every piece has already shipped in a Varix project th
 - **Retrieval pattern:** BAAI/bge-m3 embeddings into ChromaDB (identical to the thesis pipeline), retrieved and handed to Groq as context for natural-language Q&A.
 - **Trend analysis & HR flagging are hybrid, not pure-LLM:** scheduled jobs compute the actual seasonality stats and attendance-pattern math deterministically (reliable, auditable), and Malaya's job is to *narrate* those computed results in plain language — not to do the arithmetic herself. This avoids the classic failure mode of asking an LLM to silently miscalculate a margin.
 
-**Automation layer — n8n**
-Running on the same Oracle VM, this is where the "glue" logic lives instead of being buried in custom backend code:
+**Automation layer — no longer n8n (2026-07-30)**
+n8n has been dropped from this build entirely. The "glue" logic it was meant to own still needs to exist somewhere:
 - Ingredient nearing expiry → posts to that branch's Newsfeed + Slack channel + Zoho Mail alert
 - Stock crossing reorder threshold → notifies the branch manager
 - HR pattern flag triggered → notifies manager and executive dashboards
 - End of day → compiles and emails the daily digest to relevant roles
 
-This also matches how Varix already runs its own ops (Slack channel structure, `hello@ / vince@ / neil@ / projects@ / support@` on Zoho Mail) — the same rails get reused for the product itself.
+None of this is built yet. The leading replacement candidate is scheduled endpoints inside `services/api-fastapi` (e.g. Vercel Cron calling a `/jobs/*` route on a schedule) rather than a separate workflow tool, since the API is already on Vercel. Slack/Zoho Mail delivery specifically is deferred regardless of which engine ends up triggering it.
 
 **Hosting layer**
-- Oracle Always Free ARM VM: FastAPI backend + n8n (start on one instance; Oracle's Always Free tier permits a second ARM VM under the same account if the first gets tight — see §5).
-- Vercel: dashboard frontend, deployed straight from GitHub — same push-to-deploy flow already used for the SSA site. Main branch auto-deploys to production; feature branches get their own preview URL, so each dashboard screen (POS variants, Executive Command Center, etc.) can be reviewed live before merging.
+- Vercel: both the dashboard frontend (`smfc-ims`) and the FastAPI backend (`smfc-api`, as a Python/ASGI serverless function) — one platform, one `vercel` CLI auth. Every CLI deploy without `--prod` (or a git-based preview) gets its own preview URL.
 - Supabase: managed Postgres/Auth/Storage, free tier to start.
+- The Oracle Always Free VM is no longer part of this build — §5's Oracle capacity note below is now historical, kept for context on why it was originally being watched.
 
 ---
 
@@ -74,9 +72,9 @@ This also matches how Varix already runs its own ops (Slack channel structure, `
 |---|---|---|
 | **1** | Pilot — Malaya's Cafe | Tauri POS shell + SQLite cache, FastAPI backend, Supabase schema (products, recipes, inventory, transactions), core recipe-deduction logic. No AI yet — prove the sale-to-inventory loop works cleanly on one branch. |
 | **2** | Branch dashboards | React manager dashboard, Supabase Realtime wiring, EOD summary + loss-to-profit margin calculation, loss/defect logging UI. |
-| **3** | Multi-branch rollout | Danielito's and D' Bar Tauri POS variants (themed per the UI/UX plan), Executive web dashboard, RLS policies for cross-branch access, Oracle VM scaled if needed. |
+| **3** | Multi-branch rollout | Danielito's and D' Bar Tauri POS variants (themed per the UI/UX plan), Executive web dashboard, RLS policies for cross-branch access. |
 | **4** | Malaya goes live | ChromaDB + bge-m3 embedding pipeline, Groq-backed natural-language Q&A, trend analysis (deterministic stats + AI narration). |
-| **5** | Automation + mobile | n8n workflows for newsfeed/alerts/HR flags, iOS executive companion app, daily digest emails. |
+| **5** | Automation + mobile | Scheduled FastAPI jobs for newsfeed/alerts/HR flags (n8n dropped, see §2), iOS executive companion app, daily digest emails. |
 
 Same five phases as the business proposal — this table just makes each one concrete in terms of what actually gets opened in an editor.
 
@@ -90,7 +88,7 @@ Your dev machine (Ryzen 5 PRO 3400G, 24GB RAM, GTX 1050 Ti — 4GB VRAM) is plen
 
 ## 5. Things Worth Watching
 
-- **Oracle Always Free capacity — update:** Oracle cut the Always Free Ampere A1 (ARM) allocation in June 2026, from 4 OCPU/24GB down to a **2 OCPU / 12GB pool shared across all Ampere A1 instances in the account** — it's no longer possible to just spin up a second free VM to double capacity, since the cap applies to the total, not per-instance. Budget for the backend + n8n to share that single 2 OCPU/12GB pool. If it gets tight, the next step is paying for the extra Ampere A1 capacity directly (roughly $25–28/month for a full 4 OCPU/24GB at Oracle's current Arm rates) rather than assuming a second free instance will help.
+- **Oracle Always Free capacity — historical, no longer applicable.** This originally tracked a June 2026 capacity cut relevant to running the backend + n8n on an Oracle VM. Since both the backend and n8n plans changed (FastAPI is on Vercel, n8n is dropped), this is no longer a constraint to watch. Left here for context only.
 - **RLS policy correctness matters more than usual here:** since Employee/Manager/Executive access is enforced at the Supabase Postgres level, a misconfigured policy is a data-leak risk between branches, not just a UI bug. Worth a dedicated test pass before Phase 3 rollout.
 - **Offline sync conflicts:** with SQLite caching orders locally per terminal, define a clear conflict-resolution rule (e.g. last-write-wins vs. queued-in-order) before D' Bar goes live — bar tabs opened offline are the likeliest place for this to bite.
 
