@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -54,3 +55,29 @@ class TransactionResponse(BaseModel):
     closed_at: datetime | None = None
     total_amount: float
     items: list[TransactionItemResponse]
+
+
+LossReason = Literal["spoilage", "breakage", "comp", "prep_error"]
+
+
+class CreateLossRecordRequest(BaseModel):
+    branch_id: str
+    employee_id: str
+    ingredient_id: str
+    product_id: str | None = None
+    reason: LossReason
+    quantity: float
+    photo_url: str | None = None
+
+
+class LossRecordResponse(BaseModel):
+    id: str
+    branch_id: str
+    ingredient_id: str
+    product_id: str | None = None
+    employee_id: str
+    reason: LossReason
+    quantity: float
+    cost_impact: float
+    photo_url: str | None = None
+    created_at: datetime
