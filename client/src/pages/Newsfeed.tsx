@@ -312,7 +312,7 @@ export default function Newsfeed() {
     <DashboardLayout title="Newsfeed">
       <div className="p-6 space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full gap-2 bg-gray-100 mb-6" style={{ gridTemplateColumns: `repeat(${user?.role === 'executive' ? 4 : 2}, 1fr)` }}>
+          <TabsList className="grid w-full gap-2 bg-gray-100 mb-6" style={{ gridTemplateColumns: `repeat(${user?.role === 'executive' ? 4 : user?.role === 'manager' ? 2 : 1}, 1fr)` }}>
             <TabsTrigger value="alerts" className="font-corp-body">
               Alerts & Updates
             </TabsTrigger>
@@ -328,11 +328,11 @@ export default function Newsfeed() {
                   D' Bar
                 </TabsTrigger>
               </>
-            ) : (
+            ) : user?.role === 'manager' ? (
               <TabsTrigger value="overview" className="font-corp-body">
                 Branch Overview
               </TabsTrigger>
-            )}
+            ) : null}
           </TabsList>
 
           {/* Alerts Tab */}
