@@ -17,6 +17,7 @@ import HRFlags from "./pages/HRFlags";
 import Newsfeed from "./pages/Newsfeed";
 import InventoryCount from "./pages/InventoryCount";
 import LossLog from "./pages/LossLog";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 function Router() {
@@ -32,6 +33,7 @@ function Router() {
       <Route path={"/newsfeed"} component={Newsfeed} />
       <Route path={"/inventory-count"} component={InventoryCount} />
       <Route path={"/loss-log"} component={LossLog} />
+      <Route path={"/settings"} component={Settings} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
