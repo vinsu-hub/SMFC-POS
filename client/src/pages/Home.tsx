@@ -1,25 +1,35 @@
-import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { Streamdown } from 'streamdown';
+import React, { useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useLocation } from 'wouter';
 
-/**
- * All content in this page are only for example, replace with your own feature implementation
- * When building pages, remember your instructions in Frontend Best Practices, Design Guide and Common Pitfalls
- */
 export default function Home() {
-  // If theme is switchable in App.tsx, we can implement theme toggling like this:
-  // const { theme, toggleTheme } = useTheme();
+  const { isAuthenticated, user, loading } = useAuth();
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (loading) return;
+
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+
+    // Route based on role
+    if (user?.role === 'employee') {
+      navigate('/pos');
+    } else if (user?.role === 'manager') {
+      navigate('/dashboard');
+    } else if (user?.role === 'executive') {
+      navigate('/command-center');
+    }
+  }, [isAuthenticated, user, loading, navigate]);
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <main>
-        {/* Example: lucide-react for icons */}
-        <Loader2 className="animate-spin" />
-        Example Page
-        {/* Example: Streamdown for markdown rendering */}
-        <Streamdown>Any **markdown** content</Streamdown>
-        <Button variant="default">Example Button</Button>
-      </main>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <div className="w-12 h-12 border-4 border-gray-200 border-t-[#1B2A4A] rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-gray-600 font-corp-body">Loading...</p>
+      </div>
     </div>
   );
 }

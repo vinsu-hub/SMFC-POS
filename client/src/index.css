@@ -43,74 +43,75 @@
 }
 
 :root {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-600);
-  --sidebar-primary-foreground: var(--color-blue-50);
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
+  /* Corporate Shell (Command Navy) - Default theme */
+  --primary: #1B2A4A;
+  --primary-foreground: #F4F6F9;
+  --sidebar-primary: #1B2A4A;
+  --sidebar-primary-foreground: #F4F6F9;
+  
+  /* Accent colors */
+  --accent: #2E8B99;
+  --accent-foreground: #F4F6F9;
+  --chart-1: #2E8B99;
+  --chart-2: #B8860B;
+  --chart-3: #1B2A4A;
+  --chart-4: #13203A;
+  --chart-5: #6B7280;
+  
+  /* Radius */
   --radius: 0.65rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.235 0.015 65);
+  
+  /* Corporate Shell - Light theme */
+  --background: oklch(0.98 0.001 0);
+  --foreground: #2B2F36;
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.235 0.015 65);
+  --card-foreground: #2B2F36;
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.235 0.015 65);
-  --secondary: oklch(0.98 0.001 286.375);
-  --secondary-foreground: oklch(0.4 0.015 65);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.141 0.005 285.823);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.623 0.214 259.815);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.235 0.015 65);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.623 0.214 259.815);
+  --popover-foreground: #2B2F36;
+  --secondary: #F4F6F9;
+  --secondary-foreground: #2B2F36;
+  --muted: #E5E7EB;
+  --muted-foreground: #6B7280;
+  --destructive: #DC2626;
+  --destructive-foreground: oklch(1 0 0);
+  --border: #E5E7EB;
+  --input: #F3F4F6;
+  --ring: #2E8B99;
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: #2B2F36;
+  --sidebar-accent: #F4F6F9;
+  --sidebar-accent-foreground: #1B2A4A;
+  --sidebar-border: #E5E7EB;
+  --sidebar-ring: #2E8B99;
 }
 
-.dark {
-  --primary: var(--color-blue-700);
-  --primary-foreground: var(--color-blue-50);
-  --sidebar-primary: var(--color-blue-500);
-  --sidebar-primary-foreground: var(--color-blue-50);
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.85 0.005 65);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.85 0.005 65);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.85 0.005 65);
-  --secondary: oklch(0.24 0.006 286.033);
-  --secondary-foreground: oklch(0.7 0.005 65);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground:  oklch(0.92 0.005 65);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.488 0.243 264.376);
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.85 0.005 65);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground:  oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.488 0.243 264.376);
+/* Brand-specific CSS variables for easy theming */
+:root {
+  /* Danielito's Home Kitchen (Bottle & Brass) */
+  --danielito-green: #1F2E28;
+  --danielito-ivory: #F3EEE2;
+  --danielito-brass: #C9A24B;
+  --danielito-oxblood: #6B2E2E;
+  
+  /* Malaya's Cafe (Sage & Honey) */
+  --malaya-sage: #6E8368;
+  --malaya-oat: #EFE6D4;
+  --malaya-honey: #D9A441;
+  --malaya-espresso: #3C2E26;
+  
+  /* D' Bar (Aubergine & Copper) */
+  --dbar-aubergine: #241726;
+  --dbar-copper: #B5651D;
+  --dbar-garnet: #7A2E3B;
+  --dbar-bone: #E9E2D9;
+  
+  /* Corporate Shell (Command Navy) */
+  --corp-ink: #13203A;
+  --corp-navy: #1B2A4A;
+  --corp-cyan: #2E8B99;
+  --corp-brass: #B8860B;
+  --corp-cloud: #F4F6F9;
+  --corp-slate: #2B2F36;
 }
 
 @layer base {
@@ -134,24 +135,11 @@
 }
 
 @layer components {
-  /**
-   * Custom container utility that centers content and adds responsive padding.
-   *
-   * This overrides Tailwind's default container behavior to:
-   * - Auto-center content (mx-auto)
-   * - Add responsive horizontal padding
-   * - Set max-width for large screens
-   *
-   * Usage: <div className="container">...</div>
-   *
-   * For custom widths, use max-w-* utilities directly:
-   * <div className="max-w-6xl mx-auto px-4">...</div>
-   */
   .container {
     width: 100%;
     margin-left: auto;
     margin-right: auto;
-    padding-left: 1rem; /* 16px - mobile padding */
+    padding-left: 1rem;
     padding-right: 1rem;
   }
 
@@ -160,18 +148,99 @@
     min-width: 0;
   }
 
+  /* Brand Thread: 4px colored left border for cross-branch data */
+  .brand-thread-danielito {
+    @apply border-l-4 border-l-[#1F2E28];
+  }
+
+  .brand-thread-malaya {
+    @apply border-l-4 border-l-[#6E8368];
+  }
+
+  .brand-thread-dbar {
+    @apply border-l-4 border-l-[#B5651D];
+  }
+
+  /* Sync status indicator dot */
+  .sync-dot {
+    @apply inline-block w-2 h-2 rounded-full;
+  }
+
+  .sync-dot-synced {
+    @apply bg-green-500;
+  }
+
+  .sync-dot-syncing {
+    @apply bg-yellow-500 animate-pulse;
+  }
+
+  .sync-dot-offline {
+    @apply bg-red-500;
+  }
+
   @media (min-width: 640px) {
     .container {
-      padding-left: 1.5rem; /* 24px - tablet padding */
+      padding-left: 1.5rem;
       padding-right: 1.5rem;
     }
   }
 
   @media (min-width: 1024px) {
     .container {
-      padding-left: 2rem; /* 32px - desktop padding */
+      padding-left: 2rem;
       padding-right: 2rem;
-      max-width: 1280px; /* Standard content width */
+      max-width: 1280px;
     }
+  }
+}
+
+/* Google Fonts imports for all brand typefaces */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&family=Fraunces:wght@400;600;700&family=Public+Sans:wght@400;600;700&family=Fredoka:wght@400;500;600&family=Karla:wght@400;600;700&family=Oswald:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+/* Typography system */
+@layer base {
+  /* Corporate Shell typography */
+  .font-corp-display {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+  }
+
+  .font-corp-body {
+    font-family: 'Inter', sans-serif;
+  }
+
+  .font-corp-mono {
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* Danielito's typography */
+  .font-danielito-display {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+  }
+
+  .font-danielito-body {
+    font-family: 'Public Sans', sans-serif;
+  }
+
+  /* Malaya's typography */
+  .font-malaya-display {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 500;
+  }
+
+  .font-malaya-body {
+    font-family: 'Karla', sans-serif;
+  }
+
+  /* D' Bar typography */
+  .font-dbar-display {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+  }
+
+  .font-dbar-mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
   }
 }

@@ -1,16 +1,33 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+import { AuthProvider } from "./contexts/AuthContext";
+import { SyncProvider } from "./contexts/SyncContext";
 
+// Pages
+import Login from "./pages/Login";
+import Home from "./pages/Home";
+import POSTerminal from "./pages/POSTerminal";
+import ManagerDashboard from "./pages/ManagerDashboard";
+import CommandCenter from "./pages/CommandCenter";
+import TrendAnalysis from "./pages/TrendAnalysis";
+import HRFlags from "./pages/HRFlags";
+import Newsfeed from "./pages/Newsfeed";
+import NotFound from "./pages/NotFound";
 
 function Router() {
   return (
     <Switch>
+      <Route path={"/login"} component={Login} />
       <Route path={"/"} component={Home} />
+      <Route path={"/pos"} component={POSTerminal} />
+      <Route path={"/dashboard"} component={ManagerDashboard} />
+      <Route path={"/command-center"} component={CommandCenter} />
+      <Route path={"/trends"} component={TrendAnalysis} />
+      <Route path={"/hr-flags"} component={HRFlags} />
+      <Route path={"/newsfeed"} component={Newsfeed} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
@@ -18,22 +35,18 @@ function Router() {
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+      <ThemeProvider defaultTheme="light">
+        <AuthProvider>
+          <SyncProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </SyncProvider>
+        </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );
