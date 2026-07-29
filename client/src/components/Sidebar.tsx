@@ -38,6 +38,7 @@ export function Sidebar() {
           { icon: ShoppingCart, label: 'POS Terminal', href: '/pos', show: true },
           { icon: Package, label: 'Count Stock', href: '/inventory-count', show: true },
           { icon: AlertCircle, label: 'Log Loss', href: '/loss-log', show: true },
+          { icon: MessageSquare, label: 'Newsfeed', href: '/newsfeed', show: true },
         ]
       : []),
     ...(isManager
