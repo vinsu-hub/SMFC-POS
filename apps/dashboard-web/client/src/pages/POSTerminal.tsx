@@ -45,7 +45,7 @@ const POS_THEMES: Record<Branch, BranchPosTheme> = {
   danielito: {
     pageBg: 'bg-[#F3EEE2]',
     tabsListBg: 'bg-[#1F2E28]',
-    tabsTriggerText: 'text-white',
+    tabsTriggerText: 'text-white data-[state=active]:text-[#1F2E28]',
     itemLayout: 'list',
     itemClass:
       'w-full h-auto py-4 px-4 bg-white hover:bg-[#C9A24B] text-[#1F2E28] border-l-4 border-l-[#C9A24B] justify-between items-center font-danielito-display text-left transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]',
@@ -69,7 +69,7 @@ const POS_THEMES: Record<Branch, BranchPosTheme> = {
   malaya: {
     pageBg: 'bg-[#EFE6D4]',
     tabsListBg: 'bg-[#6E8368]',
-    tabsTriggerText: 'text-white',
+    tabsTriggerText: 'text-white data-[state=active]:text-[#3C2E26]',
     itemLayout: 'grid',
     itemClass:
       'h-32 w-full flex-col items-start justify-between rounded-2xl bg-white hover:bg-[#D9A441] text-[#3C2E26] border border-[#D9A441]/40 p-4 font-malaya-display text-left shadow-sm transition-[background-color,transform,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-0.5 hover:shadow-md active:scale-[0.97] active:translate-y-0',
@@ -93,7 +93,7 @@ const POS_THEMES: Record<Branch, BranchPosTheme> = {
   dbar: {
     pageBg: 'bg-[#241726]',
     tabsListBg: 'bg-black/40',
-    tabsTriggerText: 'text-[#E9E2D9]',
+    tabsTriggerText: 'text-[#E9E2D9] data-[state=active]:text-[#241726]',
     itemLayout: 'list',
     itemClass:
       'w-full h-auto py-4 px-4 bg-[#2E1B31] hover:bg-[#40263F] text-[#E9E2D9] border-l-4 border-l-[#B5651D] hover:border-l-[#D97C2E] justify-between items-center font-dbar-display uppercase tracking-wide text-left transition-[background-color,border-color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]',

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BRANCH_CONFIG } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
-import { DollarSign, TrendingUp, Package, AlertCircle, Users, Clock } from 'lucide-react';
+import { Banknote, TrendingUp, Package, AlertCircle, Users, Clock } from 'lucide-react';
 
 interface MetricCardProps {
   title: string;
@@ -22,7 +22,7 @@ function MetricCard({ title, value, icon: Icon, color }: MetricCardProps) {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-600 font-corp-body mb-1">{title}</p>
-            <p className="text-2xl font-corp-display font-bold text-gray-900">{value}</p>
+            <p className="text-2xl font-corp-mono font-bold text-gray-900">{value}</p>
           </div>
           <Icon className="w-8 h-8" style={{ color }} />
         </div>
@@ -135,7 +135,7 @@ export default function CommandCenter() {
               <MetricCard
                 title="Total Revenue"
                 value={formatCurrency(totalRevenue)}
-                icon={DollarSign}
+                icon={Banknote}
                 color="#B8860B"
               />
               <MetricCard
@@ -173,25 +173,25 @@ export default function CommandCenter() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs text-gray-600 font-corp-body mb-1">Revenue</p>
-                        <p className="text-xl font-corp-display font-bold text-gray-900">
+                        <p className="text-xl font-corp-mono font-bold text-gray-900">
                           {formatCurrency(branch.revenue)}
                         </p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-600 font-corp-body mb-1">Margin %</p>
-                        <p className="text-xl font-corp-display font-bold" style={{ color: branch.color }}>
+                        <p className="text-xl font-corp-mono font-bold" style={{ color: branch.color }}>
                           {branch.marginPercent}%
                         </p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-600 font-corp-body mb-1">COGS</p>
-                        <p className="text-lg font-corp-display font-semibold text-gray-900">
+                        <p className="text-lg font-corp-mono font-semibold text-gray-900">
                           {formatCurrency(branch.cogs)}
                         </p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-600 font-corp-body mb-1">Losses</p>
-                        <p className="text-lg font-corp-display font-semibold text-red-600">
+                        <p className="text-lg font-corp-mono font-semibold text-red-600">
                           {formatCurrency(branch.losses)}
                         </p>
                       </div>
@@ -200,15 +200,15 @@ export default function CommandCenter() {
                     <div className="border-t pt-4 space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-600 font-corp-body">Staff Utilization</span>
-                        <span className="font-corp-display font-semibold">{branch.avgStaffUtilization}%</span>
+                        <span className="font-corp-mono font-semibold">{branch.avgStaffUtilization}%</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-600 font-corp-body">Expiring Items</span>
-                        <span className="font-corp-display font-semibold text-orange-600">{branch.expiringItems}</span>
+                        <span className="font-corp-mono font-semibold text-orange-600">{branch.expiringItems}</span>
                       </div>
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-600 font-corp-body">Low Stock Items</span>
-                        <span className="font-corp-display font-semibold text-yellow-600">{branch.lowStockItems}</span>
+                        <span className="font-corp-mono font-semibold text-yellow-600">{branch.lowStockItems}</span>
                       </div>
                     </div>
 
@@ -243,7 +243,7 @@ export default function CommandCenter() {
                 <MetricCard
                   title="Today's Revenue"
                   value={formatCurrency(branch.todaysSales)}
-                  icon={DollarSign}
+                  icon={Banknote}
                   color={branch.color}
                 />
                 <MetricCard
@@ -276,19 +276,19 @@ export default function CommandCenter() {
                   <CardContent className="space-y-4">
                     <div className="flex items-center justify-between py-2 border-b">
                       <span className="text-gray-700 font-corp-body">Total Revenue</span>
-                      <span className="font-corp-display font-bold">{formatCurrency(branch.revenue)}</span>
+                      <span className="font-corp-mono font-bold">{formatCurrency(branch.revenue)}</span>
                     </div>
                     <div className="flex items-center justify-between py-2 border-b">
                       <span className="text-gray-700 font-corp-body">COGS</span>
-                      <span className="font-corp-display font-bold">{formatCurrency(branch.cogs)}</span>
+                      <span className="font-corp-mono font-bold">{formatCurrency(branch.cogs)}</span>
                     </div>
                     <div className="flex items-center justify-between py-2 border-b">
                       <span className="text-gray-700 font-corp-body">Losses</span>
-                      <span className="font-corp-display font-bold text-red-600">{formatCurrency(branch.losses)}</span>
+                      <span className="font-corp-mono font-bold text-red-600">{formatCurrency(branch.losses)}</span>
                     </div>
                     <div className="flex items-center justify-between py-2 bg-gray-50 px-3 rounded">
                       <span className="text-gray-700 font-corp-body font-semibold">Gross Margin</span>
-                      <span className="font-corp-display font-bold text-lg" style={{ color: branch.color }}>
+                      <span className="font-corp-mono font-bold text-lg" style={{ color: branch.color }}>
                         {formatCurrency(branch.margin)}
                       </span>
                     </div>
@@ -313,18 +313,18 @@ export default function CommandCenter() {
                             }}
                           />
                         </div>
-                        <span className="font-corp-display font-bold w-12 text-right">
+                        <span className="font-corp-mono font-bold w-12 text-right">
                           {branch.avgStaffUtilization}%
                         </span>
                       </div>
                     </div>
                     <div className="flex items-center justify-between py-2 border-b">
                       <span className="text-gray-700 font-corp-body">Expiring Items</span>
-                      <span className="font-corp-display font-bold text-orange-600">{branch.expiringItems}</span>
+                      <span className="font-corp-mono font-bold text-orange-600">{branch.expiringItems}</span>
                     </div>
                     <div className="flex items-center justify-between py-2 border-b">
                       <span className="text-gray-700 font-corp-body">Low Stock Items</span>
-                      <span className="font-corp-display font-bold text-yellow-600">{branch.lowStockItems}</span>
+                      <span className="font-corp-mono font-bold text-yellow-600">{branch.lowStockItems}</span>
                     </div>
                     <div className="flex items-center justify-between py-2">
                       <span className="text-gray-700 font-corp-body flex items-center gap-2">
@@ -346,20 +346,20 @@ export default function CommandCenter() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-xs text-gray-600 font-corp-body mb-2">Today's Sales</p>
-                      <p className="text-2xl font-corp-display font-bold text-gray-900">
+                      <p className="text-2xl font-corp-mono font-bold text-gray-900">
                         {formatCurrency(branch.todaysSales)}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-600 font-corp-body mb-2">Yesterday's Sales</p>
-                      <p className="text-2xl font-corp-display font-bold text-gray-600">
+                      <p className="text-2xl font-corp-mono font-bold text-gray-600">
                         {formatCurrency(branch.yesterdaysSales)}
                       </p>
                     </div>
                   </div>
                   <div className="bg-gray-50 p-4 rounded">
                     <p className="text-sm text-gray-700 font-corp-body mb-1">Weekly Trend</p>
-                    <p className="text-3xl font-corp-display font-bold text-green-600">{branch.weeklyTrend}</p>
+                    <p className="text-3xl font-corp-mono font-bold text-green-600">{branch.weeklyTrend}</p>
                   </div>
                 </CardContent>
               </Card>
