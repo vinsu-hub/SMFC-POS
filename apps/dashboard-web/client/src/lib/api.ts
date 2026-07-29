@@ -27,6 +27,42 @@ export interface ApiTransaction {
   items: { id: string; product_id: string; quantity: number; unit_price: number }[];
 }
 
+export interface ApiIngredient {
+  id: string;
+  branch_id: string;
+  name: string;
+  unit: string;
+  unit_cost: number;
+  current_stock: number;
+  reorder_threshold: number;
+  expiry_date: string | null;
+}
+
+export type LossReason = 'spoilage' | 'breakage' | 'comp' | 'prep_error';
+
+export interface CreateLossRecordRequest {
+  branch_id: string;
+  employee_id: string;
+  ingredient_id: string;
+  product_id?: string | null;
+  reason: LossReason;
+  quantity: number;
+  photo_url?: string | null;
+}
+
+export interface ApiLossRecord {
+  id: string;
+  branch_id: string;
+  ingredient_id: string;
+  product_id: string | null;
+  employee_id: string;
+  reason: LossReason;
+  quantity: number;
+  cost_impact: number;
+  photo_url: string | null;
+  created_at: string;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const {
     data: { session },
@@ -66,4 +102,39 @@ export function createTransaction(
 
 export function closeTransaction(transactionId: string): Promise<ApiTransaction> {
   return request(`/transactions/${transactionId}/close`, { method: 'POST' });
+}
+
+export function fetchInventory(branchId: string): Promise<ApiIngredient[]> {
+  return request(`/inventory?branch_id=${branchId}`);
+}
+
+export function createLossRecord(body: CreateLossRecordRequest): Promise<ApiLossRecord> {
+  return request('/loss-records', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function fetchBranchLosses(branchId: string): Promise<ApiLossRecord[]> {
+  return request(`/branches/${branchId}/losses`);
+}
+
+/** Uploads to the private 'loss-photos' bucket and returns the storage path
+ * (branch-scoped by RLS, see supabase/migrations/0003_loss_photos_storage.sql). */
+export async function uploadLossPhoto(branchId: string, file: File): Promise<string> {
+  const extension = file.name.split('.').pop() ?? 'jpg';
+  const path = `${branchId}/${crypto.randomUUID()}.${extension}`;
+  const { error } = await supabase.storage.from('loss-photos').upload(path, file, {
+    contentType: file.type,
+  });
+  if (error) {
+    throw new Error(`Photo upload failed: ${error.message}`);
+  }
+  return path;
+}
+
+export async function getLossPhotoUrl(path: string): Promise<string | null> {
+  const { data, error } = await supabase.storage.from('loss-photos').createSignedUrl(path, 300);
+  if (error) return null;
+  return data.signedUrl;
 }
