@@ -85,11 +85,11 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-      <Card className="w-full max-w-2xl shadow-lg">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-2xl shadow-l3-modal">
         <CardHeader className="space-y-2 text-center">
           <div className="flex justify-center mb-4">
-            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-[#1B2A4A] to-[#2E8B99] flex items-center justify-center text-white font-bold text-lg">
+            <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-lg shadow-l2-raised">
               SM
             </div>
           </div>
@@ -100,7 +100,7 @@ export default function Login() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4 mb-6">
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="text-sm font-medium text-foreground">
                 Email Address
               </label>
               <Input
@@ -115,7 +115,7 @@ export default function Login() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="text-sm font-medium text-foreground">
                 Password
               </label>
               <Input
@@ -132,7 +132,7 @@ export default function Login() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#1B2A4A] hover:bg-[#13203A] font-corp-display"
+              className="w-full font-corp-display"
             >
               {loading ? (
                 <>
@@ -145,55 +145,55 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="border-t pt-6">
-            <p className="text-sm font-corp-display font-semibold text-gray-900 mb-4">
+          <div className="border-t border-border pt-6">
+            <p className="text-sm font-corp-display font-semibold text-foreground mb-4">
               Demo Accounts (Password: demo1234)
             </p>
 
             {/* Branch Demo Accounts */}
             <div className="space-y-3 mb-4">
               {demoAccounts.map((branch) => (
-                <div key={branch.branch} className="border rounded-lg overflow-hidden">
+                <div key={branch.branch} className="rounded-lg overflow-hidden shadow-l2-raised">
                   <button
                     type="button"
                     onClick={() =>
                       setExpandedBranch(expandedBranch === branch.branch ? null : branch.branch)
                     }
-                    className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                    className="w-full flex items-center justify-between p-3 bg-card hover:bg-accent transition-colors"
                     style={{ borderLeft: `4px solid ${branch.color}` }}
                   >
                     <div className="text-left">
-                      <p className="font-corp-display font-semibold text-gray-900 text-sm">
+                      <p className="font-corp-display font-semibold text-foreground text-sm">
                         {branch.branchName}
                       </p>
-                      <p className="text-xs text-gray-600 font-corp-body">
+                      <p className="text-xs text-muted-foreground font-corp-body">
                         {branch.accounts.length} accounts
                       </p>
                     </div>
                     {expandedBranch === branch.branch ? (
-                      <ChevronUp className="w-4 h-4 text-gray-600" />
+                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
                     ) : (
-                      <ChevronDown className="w-4 h-4 text-gray-600" />
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     )}
                   </button>
 
                   {expandedBranch === branch.branch && (
-                    <div className="bg-white border-t space-y-2 p-3">
+                    <div className="bg-card border-t border-border space-y-2 p-3">
                       {branch.accounts.map((account) => (
                         <button
                           key={account.email}
                           type="button"
                           onClick={() => handleSelectAccount(account.email)}
-                          className="w-full text-left p-2 rounded hover:bg-gray-100 transition-colors"
+                          className="w-full text-left p-2 rounded-md hover:bg-accent transition-colors"
                         >
                           <div className="flex items-center justify-between">
                             <div>
-                              <p className="text-sm font-corp-body font-medium text-gray-900">
+                              <p className="text-sm font-corp-body font-medium text-foreground">
                                 {account.name}
                               </p>
-                              <code className="text-xs text-gray-600">{account.email}</code>
+                              <code className="text-xs text-muted-foreground">{account.email}</code>
                             </div>
-                            <span className="text-xs font-corp-body px-2 py-1 bg-gray-100 rounded text-gray-700 capitalize">
+                            <span className="text-xs font-corp-body px-2.5 py-1 bg-accent-soft rounded-2xl text-accent-foreground capitalize">
                               {account.role}
                             </span>
                           </div>
@@ -206,47 +206,47 @@ export default function Login() {
             </div>
 
             {/* Executive Accounts */}
-            <div className="border rounded-lg overflow-hidden">
+            <div className="rounded-lg overflow-hidden shadow-l2-raised">
               <button
                 type="button"
                 onClick={() =>
                   setExpandedBranch(expandedBranch === 'executive' ? null : 'executive')
                 }
-                className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
-                style={{ borderLeft: '4px solid #2E8B99' }}
+                className="w-full flex items-center justify-between p-3 bg-card hover:bg-accent transition-colors"
+                style={{ borderLeft: '4px solid var(--ws-color-accent)' }}
               >
                 <div className="text-left">
-                  <p className="font-corp-display font-semibold text-gray-900 text-sm">
+                  <p className="font-corp-display font-semibold text-foreground text-sm">
                     Executive (All Venues)
                   </p>
-                  <p className="text-xs text-gray-600 font-corp-body">
+                  <p className="text-xs text-muted-foreground font-corp-body">
                     {executiveAccounts.length} accounts
                   </p>
                 </div>
                 {expandedBranch === 'executive' ? (
-                  <ChevronUp className="w-4 h-4 text-gray-600" />
+                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
                 ) : (
-                  <ChevronDown className="w-4 h-4 text-gray-600" />
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
                 )}
               </button>
 
               {expandedBranch === 'executive' && (
-                <div className="bg-white border-t space-y-2 p-3">
+                <div className="bg-card border-t border-border space-y-2 p-3">
                   {executiveAccounts.map((account) => (
                     <button
                       key={account.email}
                       type="button"
                       onClick={() => handleSelectAccount(account.email)}
-                      className="w-full text-left p-2 rounded hover:bg-gray-100 transition-colors"
+                      className="w-full text-left p-2 rounded-md hover:bg-accent transition-colors"
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-sm font-corp-body font-medium text-gray-900">
+                          <p className="text-sm font-corp-body font-medium text-foreground">
                             {account.name}
                           </p>
-                          <code className="text-xs text-gray-600">{account.email}</code>
+                          <code className="text-xs text-muted-foreground">{account.email}</code>
                         </div>
-                        <span className="text-xs font-corp-body px-2 py-1 bg-[#2E8B99]/10 rounded text-[#1B2A4A] capitalize">
+                        <span className="text-xs font-corp-body px-2.5 py-1 bg-accent-soft rounded-2xl text-accent-foreground capitalize">
                           {account.role}
                         </span>
                       </div>
@@ -256,7 +256,7 @@ export default function Login() {
               )}
             </div>
 
-            <p className="text-xs text-gray-500 font-corp-body mt-4 text-center">
+            <p className="text-xs text-muted-foreground font-corp-body mt-4 text-center">
               Click any account to auto-fill the login form
             </p>
           </div>

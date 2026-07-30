@@ -45,7 +45,8 @@ const POS_THEMES: Record<Branch, BranchPosTheme> = {
   danielito: {
     pageBg: 'bg-[#F3EEE2]',
     tabsListBg: 'bg-[#1F2E28]',
-    tabsTriggerText: 'text-white data-[state=active]:text-[#1F2E28]',
+    tabsTriggerText:
+      'text-white hover:text-white/80 data-[state=active]:text-[#1F2E28] data-[state=active]:bg-[#C9A24B] data-[state=active]:border-b-transparent data-[state=active]:rounded-md',
     itemLayout: 'list',
     itemClass:
       'w-full h-auto py-4 px-4 bg-white hover:bg-[#C9A24B] text-[#1F2E28] border-l-4 border-l-[#C9A24B] justify-between items-center font-danielito-display text-left transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]',
@@ -56,20 +57,21 @@ const POS_THEMES: Record<Branch, BranchPosTheme> = {
     ticketHeading: 'font-danielito-display font-semibold text-[#1F2E28]',
     ticketItemBorder: 'border-l-4 border-l-[#1F2E28]',
     ticketItemName: 'font-danielito-display font-semibold text-[#1F2E28]',
-    ticketItemPrice: 'text-gray-500',
+    ticketItemPrice: 'text-muted-foreground',
     totalsDivider: 'border-t-2 border-t-[#1F2E28]',
-    totalsLabel: 'font-corp-body text-gray-700',
+    totalsLabel: 'font-corp-body text-foreground',
     totalRowBg: 'bg-[#C9A24B]/20',
     totalRowText: 'font-danielito-display font-bold text-lg text-[#1F2E28]',
     checkoutBtn:
       'bg-[#1F2E28] hover:bg-[#6B2E2E] text-white font-danielito-display transition-[background-color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]',
-    emptyText: 'text-gray-400 font-danielito-body',
+    emptyText: 'text-muted-foreground font-danielito-body',
     loadingText: 'text-[#1F2E28]',
   },
   malaya: {
     pageBg: 'bg-[#EFE6D4]',
     tabsListBg: 'bg-[#6E8368]',
-    tabsTriggerText: 'text-white data-[state=active]:text-[#3C2E26]',
+    tabsTriggerText:
+      'text-white hover:text-white/80 data-[state=active]:text-[#3C2E26] data-[state=active]:bg-[#D9A441] data-[state=active]:border-b-transparent data-[state=active]:rounded-md',
     itemLayout: 'grid',
     itemClass:
       'h-32 w-full flex-col items-start justify-between rounded-2xl bg-white hover:bg-[#D9A441] text-[#3C2E26] border border-[#D9A441]/40 p-4 font-malaya-display text-left shadow-sm transition-[background-color,transform,box-shadow] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] hover:-translate-y-0.5 hover:shadow-md active:scale-[0.97] active:translate-y-0',
@@ -93,7 +95,8 @@ const POS_THEMES: Record<Branch, BranchPosTheme> = {
   dbar: {
     pageBg: 'bg-[#241726]',
     tabsListBg: 'bg-black/40',
-    tabsTriggerText: 'text-[#E9E2D9] data-[state=active]:text-[#241726]',
+    tabsTriggerText:
+      'text-[#E9E2D9] hover:text-[#E9E2D9]/80 data-[state=active]:text-[#241726] data-[state=active]:bg-[#B5651D] data-[state=active]:border-b-transparent data-[state=active]:rounded-md',
     itemLayout: 'list',
     itemClass:
       'w-full h-auto py-4 px-4 bg-[#2E1B31] hover:bg-[#40263F] text-[#E9E2D9] border-l-4 border-l-[#B5651D] hover:border-l-[#D97C2E] justify-between items-center font-dbar-display uppercase tracking-wide text-left transition-[background-color,border-color,transform] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] active:scale-[0.97]',
@@ -140,7 +143,7 @@ export default function POSTerminal() {
     return (
       <DashboardLayout>
         <div className="p-6 text-center">
-          <p className="text-red-600">Access denied. This page is for employees only.</p>
+          <p className="text-destructive">Access denied. This page is for employees only.</p>
         </div>
       </DashboardLayout>
     );
@@ -214,9 +217,9 @@ export default function POSTerminal() {
 
   return (
     <DashboardLayout title="POS Terminal">
-      <div className={`flex h-full ${theme.pageBg}`}>
+      <div className={`flex flex-col md:flex-row h-full ${theme.pageBg}`}>
         {/* Menu Section */}
-        <div className="flex-1 p-6 overflow-auto">
+        <div className="flex-1 p-4 md:p-6 overflow-auto">
           {loadingProducts ? (
             <div className={`flex items-center justify-center h-full ${theme.loadingText}`}>
               <Loader2 className="w-6 h-6 mr-2 animate-spin" />
@@ -229,7 +232,7 @@ export default function POSTerminal() {
           ) : (
             <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
               <TabsList
-                className={`mb-6 ${theme.tabsListBg}`}
+                className={`mb-6 h-auto gap-1 rounded-lg border-0 p-1 ${theme.tabsListBg}`}
                 style={{ display: 'grid', gridTemplateColumns: `repeat(${categories.length}, 1fr)` }}
               >
                 {categories.map((category) => (
@@ -269,9 +272,9 @@ export default function POSTerminal() {
           )}
         </div>
 
-        {/* Ticket Rail (Right Side) */}
+        {/* Ticket Rail (Right Side on desktop, stacked below on mobile) */}
         <div
-          className={`w-80 ${theme.ticketBg} ${theme.ticketBorder} p-6 flex flex-col overflow-hidden shadow-lg`}
+          className={`w-full md:w-80 shrink-0 max-h-[60vh] md:max-h-none ${theme.ticketBg} ${theme.ticketBorder} p-4 md:p-6 flex flex-col overflow-hidden shadow-lg`}
         >
           <h2 className={`text-xl mb-4 ${theme.ticketHeading}`}>Ticket</h2>
 
@@ -294,7 +297,7 @@ export default function POSTerminal() {
                         variant="ghost"
                         size="sm"
                         onClick={() => removeItem(item.id)}
-                        className="text-red-500 hover:text-red-700"
+                        className="text-destructive hover:text-destructive/80"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>

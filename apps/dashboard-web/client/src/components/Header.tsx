@@ -4,16 +4,19 @@ import { useSync } from '@/contexts/SyncContext';
 import { BRANCH_CONFIG } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { LogOut, Settings } from 'lucide-react';
+import { LogOut, Menu, Settings } from 'lucide-react';
+import { useLocation } from 'wouter';
 
 interface HeaderProps {
   title?: string;
   showLogo?: boolean;
+  onMenuClick?: () => void;
 }
 
-export function Header({ title, showLogo = true }: HeaderProps) {
+export function Header({ title, showLogo = true, onMenuClick }: HeaderProps) {
   const { user, logout } = useAuth();
   const { syncStatus } = useSync();
+  const [, navigate] = useLocation();
 
   if (!user) return null;
 
@@ -24,23 +27,34 @@ export function Header({ title, showLogo = true }: HeaderProps) {
   const getSyncDotColor = () => {
     switch (syncStatus.status) {
       case 'synced':
-        return 'bg-green-500';
+        return 'bg-success';
       case 'syncing':
-        return 'bg-yellow-500 animate-pulse';
+        return 'bg-warning animate-pulse';
       case 'offline-queued':
-        return 'bg-red-500';
+        return 'bg-destructive';
       default:
-        return 'bg-gray-500';
+        return 'bg-muted-foreground';
     }
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-white shadow-sm">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-card shadow-none">
       <div className="flex items-center justify-between px-4 py-3 md:px-6">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          {onMenuClick && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="md:hidden shrink-0"
+              onClick={onMenuClick}
+              aria-label="Open menu"
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
+          )}
           {showLogo && (
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-l2-raised"
               style={{ backgroundColor: branchConfig.color }}
             >
               {user.branch === 'danielito' && 'D'}
@@ -49,11 +63,11 @@ export function Header({ title, showLogo = true }: HeaderProps) {
               {!user.branch && 'HQ'}
             </div>
           )}
-          <div>
-            <h1 className="text-lg font-corp-display font-semibold text-gray-900">
+          <div className="min-w-0">
+            <h1 className="text-lg font-corp-display font-semibold text-foreground truncate">
               {title || branchConfig.name}
             </h1>
-            <p className="text-xs text-gray-500 capitalize">
+            <p className="text-xs text-muted-foreground capitalize truncate">
               {user.role} • {user.branch ?? 'All Venues'}
             </p>
           </div>
@@ -63,7 +77,7 @@ export function Header({ title, showLogo = true }: HeaderProps) {
           {/* Sync Status Indicator */}
           <div className="flex items-center gap-2">
             <div className={`sync-dot ${getSyncDotColor()}`} />
-            <span className="text-xs text-gray-600 hidden sm:inline">
+            <span className="text-xs text-muted-foreground hidden sm:inline">
               {syncStatus.status === 'synced' && 'Synced'}
               {syncStatus.status === 'syncing' && 'Syncing...'}
               {syncStatus.status === 'offline-queued' && 'Offline'}
@@ -84,13 +98,13 @@ export function Header({ title, showLogo = true }: HeaderProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem disabled>
-                <span className="text-xs text-gray-500">{user.email}</span>
+                <span className="text-xs text-muted-foreground">{user.email}</span>
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/settings')}>
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={logout} className="text-red-600">
+              <DropdownMenuItem onClick={logout} className="text-destructive">
                 <LogOut className="w-4 h-4 mr-2" />
                 Logout
               </DropdownMenuItem>

@@ -36,13 +36,13 @@ function reasonLabel(reason: LossReason) {
 function getReasonColor(reason: LossReason) {
   switch (reason) {
     case 'spoilage':
-      return 'bg-blue-100 text-blue-800';
+      return 'bg-accent-soft text-accent-foreground';
     case 'breakage':
-      return 'bg-red-100 text-red-800';
+      return 'bg-error-bg text-destructive';
     case 'comp':
-      return 'bg-green-100 text-green-800';
+      return 'bg-success-bg text-success';
     case 'prep_error':
-      return 'bg-yellow-100 text-yellow-800';
+      return 'bg-warning-bg text-warning';
   }
 }
 
@@ -138,33 +138,33 @@ export default function LossLog() {
       <div className="p-6 space-y-6">
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="border-l-4 border-l-red-500">
+          <Card className="border-l-4 border-l-destructive">
             <CardContent className="p-4">
-              <p className="text-sm text-gray-600 font-corp-body mb-1">Total Losses Today</p>
-              <p className="text-3xl font-corp-display font-bold text-red-600">
+              <p className="text-sm text-muted-foreground font-corp-body mb-1">Total Losses Today</p>
+              <p className="text-3xl font-corp-display font-bold text-destructive">
                 {formatCurrency(totalLosses)}
               </p>
-              <p className="text-xs text-gray-500 mt-2">{todaysLosses.length} items logged</p>
+              <p className="text-xs text-muted-foreground mt-2">{todaysLosses.length} items logged</p>
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-yellow-500">
+          <Card className="border-l-4 border-l-warning">
             <CardContent className="p-4">
-              <p className="text-sm text-gray-600 font-corp-body mb-1">Logged (recent)</p>
-              <p className="text-3xl font-corp-display font-bold text-yellow-600">
+              <p className="text-sm text-muted-foreground font-corp-body mb-1">Logged (recent)</p>
+              <p className="text-3xl font-corp-display font-bold text-warning">
                 {losses.length}
               </p>
-              <p className="text-xs text-gray-500 mt-2">Most recent entries for this branch</p>
+              <p className="text-xs text-muted-foreground mt-2">Most recent entries for this branch</p>
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-blue-500">
+          <Card className="border-l-4 border-l-primary">
             <CardContent className="p-4">
-              <p className="text-sm text-gray-600 font-corp-body mb-1">Top Loss Reason</p>
-              <p className="text-3xl font-corp-display font-bold text-blue-600">
+              <p className="text-sm text-muted-foreground font-corp-body mb-1">Top Loss Reason</p>
+              <p className="text-3xl font-corp-display font-bold text-accent-foreground">
                 {topReason ? reasonLabel(topReason[0] as LossReason) : '—'}
               </p>
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-muted-foreground mt-2">
                 {topReason
                   ? `${Math.round((topReason[1] / todaysLosses.length) * 100)}% of today's losses`
                   : 'No losses logged today'}
@@ -176,7 +176,7 @@ export default function LossLog() {
         {/* Add Loss Button */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-[#1B2A4A] hover:bg-[#13203A] font-corp-display gap-2">
+            <Button className="font-corp-display gap-2">
               <Plus className="w-4 h-4" />
               Log Loss
             </Button>
@@ -191,7 +191,7 @@ export default function LossLog() {
 
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-gray-700 block mb-1">Item</label>
+                <label className="text-sm font-medium text-foreground block mb-1">Item</label>
                 <Select
                   value={form.ingredientId}
                   onValueChange={(value) => setForm({ ...form, ingredientId: value })}
@@ -210,7 +210,7 @@ export default function LossLog() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-700 block mb-1">
+                <label className="text-sm font-medium text-foreground block mb-1">
                   Quantity {form.ingredientId && `(${ingredientUnit(form.ingredientId)})`}
                 </label>
                 <Input
@@ -223,7 +223,7 @@ export default function LossLog() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-700 block mb-1">Reason</label>
+                <label className="text-sm font-medium text-foreground block mb-1">Reason</label>
                 <Select
                   value={form.reason}
                   onValueChange={(value) => setForm({ ...form, reason: value as LossReason })}
@@ -242,7 +242,7 @@ export default function LossLog() {
               </div>
 
               <div>
-                <label className="text-sm font-medium text-gray-700 block mb-1">
+                <label className="text-sm font-medium text-foreground block mb-1">
                   Photo (optional)
                 </label>
                 <Input
@@ -256,7 +256,7 @@ export default function LossLog() {
               <Button
                 onClick={handleAddLoss}
                 disabled={submitting}
-                className="w-full bg-[#1B2A4A] hover:bg-[#13203A] font-corp-display"
+                className="w-full font-corp-display"
               >
                 {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                 Log Loss
@@ -276,14 +276,14 @@ export default function LossLog() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="flex items-center justify-center py-8 text-gray-500">
+              <div className="flex items-center justify-center py-8 text-muted-foreground">
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Loading loss log...
               </div>
             ) : losses.length === 0 ? (
               <div className="text-center py-8">
-                <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-600 font-corp-body">No losses logged today</p>
+                <AlertCircle className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+                <p className="text-muted-foreground font-corp-body">No losses logged today</p>
               </div>
             ) : (
               <Table>
@@ -301,7 +301,7 @@ export default function LossLog() {
                   {losses.map((loss) => (
                     <TableRow key={loss.id}>
                       <TableCell>
-                        <p className="font-corp-body font-semibold text-gray-900">
+                        <p className="font-corp-body font-semibold text-foreground">
                           {ingredientName(loss.ingredient_id)}
                         </p>
                       </TableCell>
@@ -313,7 +313,7 @@ export default function LossLog() {
                           {reasonLabel(loss.reason)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-gray-500 font-corp-body">
+                      <TableCell className="text-sm text-muted-foreground font-corp-body">
                         {new Date(loss.created_at).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right font-corp-mono font-semibold">
@@ -326,7 +326,7 @@ export default function LossLog() {
                               href={photoUrls[loss.photo_url]}
                               target="_blank"
                               rel="noreferrer"
-                              className="text-blue-600 underline text-xs"
+                              className="text-accent-foreground underline text-xs"
                             >
                               View
                             </a>
@@ -340,7 +340,7 @@ export default function LossLog() {
                             </Button>
                           )
                         ) : (
-                          <span className="text-gray-300 text-xs">—</span>
+                          <span className="text-muted-foreground/40 text-xs">—</span>
                         )}
                       </TableCell>
                     </TableRow>

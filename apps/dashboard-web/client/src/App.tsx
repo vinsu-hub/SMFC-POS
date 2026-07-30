@@ -13,6 +13,7 @@ import POSTerminal from "./pages/POSTerminal";
 import ManagerDashboard from "./pages/ManagerDashboard";
 import CommandCenter from "./pages/CommandCenter";
 import TrendAnalysis from "./pages/TrendAnalysis";
+import MalayaChat from "./pages/MalayaChat";
 import HRFlags from "./pages/HRFlags";
 import Newsfeed from "./pages/Newsfeed";
 import InventoryCount from "./pages/InventoryCount";
@@ -29,6 +30,7 @@ function Router() {
       <Route path={"/dashboard"} component={ManagerDashboard} />
       <Route path={"/command-center"} component={CommandCenter} />
       <Route path={"/trends"} component={TrendAnalysis} />
+      <Route path={"/malaya"} component={MalayaChat} />
       <Route path={"/hr-flags"} component={HRFlags} />
       <Route path={"/newsfeed"} component={Newsfeed} />
       <Route path={"/inventory-count"} component={InventoryCount} />

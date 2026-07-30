@@ -12,16 +12,22 @@ import {
   TrendingUp,
   MessageSquare,
   Settings,
-  Menu,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
   X,
-  Bell,
 } from 'lucide-react';
-import { useState } from 'react';
 
-export function Sidebar() {
+interface SidebarProps {
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  mobileOpen: boolean;
+  onCloseMobile: () => void;
+}
+
+export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile }: SidebarProps) {
   const { user } = useAuth();
   const [location, navigate] = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
 
   if (!user) return null;
 
@@ -56,6 +62,7 @@ export function Sidebar() {
       ? [
           { icon: BarChart3, label: 'Command Center', href: '/command-center', show: true },
           { icon: TrendingUp, label: 'Trend Analysis', href: '/trends', show: true },
+          { icon: Sparkles, label: 'Malaya AI', href: '/malaya', show: true },
           { icon: Users, label: 'HR Flags', href: '/hr-flags', show: true },
           { icon: MessageSquare, label: 'Newsfeed', href: '/newsfeed', show: true },
         ]
@@ -63,87 +70,98 @@ export function Sidebar() {
     { icon: Settings, label: 'Settings', href: '/settings', show: true },
   ];
 
-  const activeItem = navItems.find((item) => item.href === location);
-
-  const sidebarContent = (
-    <>
-      <div className="p-4 border-b">
-        <div className="flex items-center gap-3">
+  function renderSidebar(isCollapsed: boolean, onNavigate: (href: string) => void) {
+    return (
+      <>
+        <div className={`p-4 border-b border-border flex items-center gap-3 ${isCollapsed ? 'justify-center px-2' : ''}`}>
           <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-lg"
+            className="w-10 h-10 shrink-0 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-l2-raised"
             style={{ backgroundColor: branchConfig.color }}
+            title={isCollapsed ? branchConfig.name : undefined}
           >
             {user.branch === 'danielito' && 'D'}
             {user.branch === 'malaya' && 'M'}
             {user.branch === 'dbar' && 'B'}
             {!user.branch && 'HQ'}
           </div>
-          <div>
-            <h2 className="text-sm font-corp-display font-semibold text-gray-900">
-              {branchConfig.name}
-            </h2>
-            <p className="text-xs text-gray-500 capitalize">{user.role}</p>
-          </div>
+          {!isCollapsed && (
+            <div className="min-w-0">
+              <h2 className="text-sm font-corp-display font-semibold text-foreground truncate">
+                {branchConfig.name}
+              </h2>
+              <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
+            </div>
+          )}
         </div>
-      </div>
 
-      <nav className="flex-1 overflow-y-auto p-2">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = location === item.href;
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden p-2">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = location === item.href;
 
-          return (
-            <Button
-              key={item.href}
-              variant={isActive ? 'default' : 'ghost'}
-              className={`w-full justify-start gap-3 mb-1 ${
-                isActive
-                  ? 'bg-[#1B2A4A] text-white hover:bg-[#13203A]'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-              onClick={() => {
-                navigate(item.href);
-                setMobileOpen(false);
-              }}
-            >
-              <Icon className="w-4 h-4" />
-              <span className="font-corp-body text-sm">{item.label}</span>
-            </Button>
-          );
-        })}
-      </nav>
+            return (
+              <Button
+                key={item.href}
+                variant={isActive ? 'default' : 'ghost'}
+                title={isCollapsed ? item.label : undefined}
+                className={`w-full mb-1 ${isCollapsed ? 'justify-center px-0' : 'justify-start gap-3'} ${
+                  isActive ? '' : 'text-foreground shadow-none hover:bg-accent'
+                }`}
+                onClick={() => onNavigate(item.href)}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                {!isCollapsed && <span className="font-corp-body text-sm">{item.label}</span>}
+              </Button>
+            );
+          })}
+        </nav>
 
-      <div className="p-4 border-t text-xs text-gray-500 font-corp-body">
-        <p>Saint Michael Food Corp</p>
-        <p>v1.0.0</p>
-      </div>
-    </>
-  );
+        {!isCollapsed && (
+          <div className="p-4 border-t border-border text-xs text-muted-foreground font-corp-body">
+            <p>Saint Michael Food Corp</p>
+            <p>v1.0.0</p>
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-64 flex-col bg-white border-r border-gray-200">
-        {sidebarContent}
+      <aside
+        className={`hidden md:flex flex-col bg-sidebar border-r border-sidebar-border transition-[width] duration-200 relative ${
+          collapsed ? 'w-20' : 'w-64'
+        }`}
+      >
+        {renderSidebar(collapsed, (href) => navigate(href))}
+        <Button
+          variant="outline"
+          size="icon-sm"
+          onClick={onToggleCollapse}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="absolute -right-3 top-16 rounded-full bg-card shadow-l2-raised"
+        >
+          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </Button>
       </aside>
 
-      {/* Mobile Header with Menu Button */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-200 flex items-center justify-between px-4 py-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setMobileOpen(!mobileOpen)}
-          className="md:hidden"
-        >
-          {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </Button>
-      </div>
-
-      {/* Mobile Sidebar */}
+      {/* Mobile Sidebar Drawer */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-30 bg-black/50 md:hidden" onClick={() => setMobileOpen(false)}>
-          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-white flex flex-col">
-            {sidebarContent}
+        <div className="fixed inset-0 z-[60] bg-black/50 md:hidden" onClick={onCloseMobile}>
+          <aside
+            className="absolute left-0 top-0 bottom-0 w-64 bg-sidebar flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-end p-2">
+              <Button variant="ghost" size="icon-sm" onClick={onCloseMobile} aria-label="Close menu">
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+            {renderSidebar(false, (href) => {
+              navigate(href);
+              onCloseMobile();
+            })}
           </aside>
         </div>
       )}

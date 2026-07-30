@@ -20,7 +20,6 @@ The original proposal recommended a generic React/Node/PostgreSQL stack. This ve
 | **GitHub → Vercel CI/CD** (push-to-deploy) | SSA platform | Version control for the dashboard codebase; every push to `main` auto-deploys, every branch/PR gets a preview URL |
 | **Laravel** | SSA platform | Available as an alternative CRUD backend if the team prefers PHP for admin-style screens |
 | **Vercel / Netlify** | SSA platform | Hosts the Manager/Executive web dashboards, and (as built) the FastAPI backend too — see §5 |
-| **Zoho Mail (varixph.com) + Slack channels** | Varix ops | Delivery channels for automated alerts and the daily digest |
 | **iOS development capability** | Varix specialty | An Executive companion app for on-the-go glances and Malaya chat |
 | **Arduino / RFID / sensor integration** | eBALIK | Optional future hardware layer — see §6 |
 
@@ -52,12 +51,15 @@ Nothing here is a stretch. Every piece has already shipped in a Varix project th
 
 **Automation layer — no longer n8n (2026-07-30)**
 n8n has been dropped from this build entirely. The "glue" logic it was meant to own still needs to exist somewhere:
-- Ingredient nearing expiry → posts to that branch's Newsfeed + Slack channel + Zoho Mail alert
-- Stock crossing reorder threshold → notifies the branch manager
-- HR pattern flag triggered → notifies manager and executive dashboards
-- End of day → compiles and emails the daily digest to relevant roles
+- Ingredient nearing expiry → posts to that branch's Newsfeed
+- Stock crossing reorder threshold → notifies the branch manager (in-app)
+- HR pattern flag triggered → notifies manager and executive dashboards (in-app)
+- End of day → compiles the daily digest on the dashboard for relevant roles
 
-None of this is built yet. The leading replacement candidate is scheduled endpoints inside `services/api-fastapi` (e.g. Vercel Cron calling a `/jobs/*` route on a schedule) rather than a separate workflow tool, since the API is already on Vercel. Slack/Zoho Mail delivery specifically is deferred regardless of which engine ends up triggering it.
+None of this is built yet. The leading replacement candidate is scheduled endpoints inside `services/api-fastapi` (e.g. Vercel Cron calling a `/jobs/*` route on a schedule) rather than a separate workflow tool, since the API is already on Vercel.
+
+**External delivery (Slack, Zoho Mail) — dropped, not deferred (2026-07-31)**
+Slack channels and Zoho Mail were the originally planned delivery channels for the items above. Both are now out of scope entirely, same treatment as n8n — removed from §1's stack table and from the backend plan's env checklist. Every alert above is in-app only (Newsfeed / dashboard), full stop, until a real need for external delivery is scoped. SMS was never part of this plan at any point and was never more than a stray frontend toggle with nothing behind it — that toggle has been removed.
 
 **Hosting layer**
 - Vercel: both the dashboard frontend (`smfc-ims`) and the FastAPI backend (`smfc-api`, as a Python/ASGI serverless function) — one platform, one `vercel` CLI auth. Every CLI deploy without `--prod` (or a git-based preview) gets its own preview URL.
@@ -74,7 +76,7 @@ None of this is built yet. The leading replacement candidate is scheduled endpoi
 | **2** | Branch dashboards | React manager dashboard, Supabase Realtime wiring, EOD summary + loss-to-profit margin calculation, loss/defect logging UI. |
 | **3** | Multi-branch rollout | Danielito's and D' Bar Tauri POS variants (themed per the UI/UX plan), Executive web dashboard, RLS policies for cross-branch access. |
 | **4** | Malaya goes live | ChromaDB + bge-m3 embedding pipeline, Groq-backed natural-language Q&A, trend analysis (deterministic stats + AI narration). |
-| **5** | Automation + mobile | Scheduled FastAPI jobs for newsfeed/alerts/HR flags (n8n dropped, see §2), iOS executive companion app, daily digest emails. |
+| **5** | Automation + mobile | Scheduled FastAPI jobs for newsfeed/alerts/HR flags (n8n dropped, see §2), iOS executive companion app, in-app daily digest (no external delivery, see §2). |
 
 Same five phases as the business proposal — this table just makes each one concrete in terms of what actually gets opened in an editor.
 

@@ -148,3 +148,73 @@ export async function getLossPhotoUrl(path: string): Promise<string | null> {
   if (error) return null;
   return data.signedUrl;
 }
+
+export interface HourlyRevenuePoint {
+  hour: number;
+  revenue: number;
+}
+
+export interface ApiBranchSummary {
+  branch_id: string;
+  branch_name: string;
+  revenue: number;
+  cogs: number;
+  losses: number;
+  margin: number;
+  margin_percent: number;
+  hourly_revenue: HourlyRevenuePoint[];
+}
+
+export interface ApiOrganizationSummary {
+  organization_id: string;
+  branches: ApiBranchSummary[];
+  total_revenue: number;
+  total_cogs: number;
+  total_losses: number;
+  total_margin: number;
+  total_margin_percent: number;
+  hourly_revenue: HourlyRevenuePoint[];
+}
+
+export function fetchBranchSummary(branchId: string): Promise<ApiBranchSummary> {
+  return request(`/branches/${branchId}/summary`);
+}
+
+export function fetchOrganizationSummary(organizationId: string): Promise<ApiOrganizationSummary> {
+  return request(`/organizations/${organizationId}/summary`);
+}
+
+/** Resolves the caller's own organization — use this from the Executive
+ * Overview instead of fetchOrganizationSummary, since the frontend has no
+ * organization_id to pass (profiles only carries branch_id/role). */
+export function fetchMyOrganizationSummary(): Promise<ApiOrganizationSummary> {
+  return request('/organizations/summary');
+}
+
+export interface ApiMalayaChartPoint {
+  label: string;
+  value: number;
+}
+
+export interface ApiMalayaChartSeries {
+  name: string;
+  data: ApiMalayaChartPoint[];
+}
+
+export interface ApiMalayaChartSpec {
+  type: 'bar' | 'line';
+  title: string;
+  series: ApiMalayaChartSeries[];
+}
+
+export interface ApiMalayaResponse {
+  answer: string;
+  chart: ApiMalayaChartSpec | null;
+}
+
+export function queryMalaya(question: string): Promise<ApiMalayaResponse> {
+  return request('/malaya/query', {
+    method: 'POST',
+    body: JSON.stringify({ question }),
+  });
+}

@@ -12,7 +12,7 @@ export default function TrendAnalysis() {
     return (
       <DashboardLayout>
         <div className="p-6 text-center">
-          <p className="text-red-600">Access denied. This page is for executives only.</p>
+          <p className="text-destructive">Access denied. This page is for executives only.</p>
         </div>
       </DashboardLayout>
     );
@@ -66,18 +66,18 @@ export default function TrendAnalysis() {
   ];
 
   const getHeatmapColor = (value: number) => {
-    if (value >= 60) return 'bg-green-600';
-    if (value >= 50) return 'bg-green-400';
-    if (value >= 40) return 'bg-yellow-300';
-    if (value >= 30) return 'bg-orange-300';
-    return 'bg-red-300';
+    if (value >= 60) return 'bg-success';
+    if (value >= 50) return 'bg-success/60';
+    if (value >= 40) return 'bg-warning/70';
+    if (value >= 30) return 'bg-warning';
+    return 'bg-destructive/80';
   };
 
   return (
     <DashboardLayout title="Trend Analysis">
       <div className="p-6 space-y-6">
         {/* Seasonality Heatmap */}
-        <Card className="border-l-4 border-l-[#1B2A4A]">
+        <Card className="border-l-4 border-l-primary">
           <CardHeader>
             <CardTitle className="font-corp-display">Seasonality Heatmap (Units Sold)</CardTitle>
           </CardHeader>
@@ -113,7 +113,7 @@ export default function TrendAnalysis() {
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-gray-500 mt-4 font-corp-body">
+            <p className="text-xs text-muted-foreground mt-4 font-corp-body">
               Green = high demand, Red = low demand. Use this to plan inventory and staffing.
             </p>
           </CardContent>
@@ -121,7 +121,7 @@ export default function TrendAnalysis() {
 
         {/* Trending Products */}
         <div className="space-y-4">
-          <h2 className="text-xl font-corp-display font-semibold text-gray-900">
+          <h2 className="text-xl font-corp-display font-semibold text-foreground">
             Product Trends & Recommendations
           </h2>
 
@@ -130,26 +130,26 @@ export default function TrendAnalysis() {
               <Card
                 key={idx}
                 className={`border-l-4 ${
-                  product.trend === 'rising' ? 'border-l-green-500' : 'border-l-red-500'
+                  product.trend === 'rising' ? 'border-l-success' : 'border-l-destructive'
                 }`}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <h3 className="font-corp-display font-semibold text-gray-900">
+                      <h3 className="font-corp-display font-semibold text-foreground">
                         {product.name}
                       </h3>
-                      <p className="text-xs text-gray-500 font-corp-body">{product.branch}</p>
+                      <p className="text-xs text-muted-foreground font-corp-body">{product.branch}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       {product.trend === 'rising' ? (
-                        <TrendingUp className="w-5 h-5 text-green-600" />
+                        <TrendingUp className="w-5 h-5 text-success" />
                       ) : (
-                        <TrendingDown className="w-5 h-5 text-red-600" />
+                        <TrendingDown className="w-5 h-5 text-destructive" />
                       )}
                       <span
                         className={`font-corp-mono font-bold text-lg ${
-                          product.trend === 'rising' ? 'text-green-600' : 'text-red-600'
+                          product.trend === 'rising' ? 'text-success' : 'text-destructive'
                         }`}
                       >
                         {product.trend === 'rising' ? '+' : '-'}
@@ -158,9 +158,9 @@ export default function TrendAnalysis() {
                     </div>
                   </div>
 
-                  <div className="bg-blue-50 border border-blue-200 rounded p-3 flex gap-2">
-                    <Zap className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-                    <p className="text-sm font-corp-body text-blue-900">{product.suggestion}</p>
+                  <div className="bg-accent-soft border border-border-regular rounded-md p-3 flex gap-2">
+                    <Zap className="w-4 h-4 text-accent-foreground flex-shrink-0 mt-0.5" />
+                    <p className="text-sm font-corp-body text-accent-foreground">{product.suggestion}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -169,12 +169,12 @@ export default function TrendAnalysis() {
         </div>
 
         {/* Summary */}
-        <Card className="border-l-4 border-l-[#1B2A4A] bg-gradient-to-r from-blue-50 to-transparent">
+        <Card className="border-l-4 border-l-primary bg-accent-soft">
           <CardContent className="p-6">
-            <h3 className="font-corp-display font-semibold text-gray-900 mb-3">
+            <h3 className="font-corp-display font-semibold text-foreground mb-3">
               Key Insights
             </h3>
-            <ul className="space-y-2 text-sm font-corp-body text-gray-700">
+            <ul className="space-y-2 text-sm font-corp-body text-foreground">
               <li>✓ Cocktails are the strongest performer — up 34% YoY</li>
               <li>✓ Seasonal desserts are gaining momentum — prepare for holiday rush</li>
               <li>✓ Traditional proteins (Crispy Pata, Ensaymada) are declining — consider rotating menu</li>

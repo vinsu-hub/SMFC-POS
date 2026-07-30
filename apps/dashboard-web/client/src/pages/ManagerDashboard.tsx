@@ -14,7 +14,7 @@ export default function ManagerDashboard() {
     return (
       <DashboardLayout>
         <div className="p-6 text-center">
-          <p className="text-red-600">Access denied. This page is for managers only.</p>
+          <p className="text-destructive">Access denied. This page is for managers only.</p>
         </div>
       </DashboardLayout>
     );
@@ -68,7 +68,7 @@ export default function ManagerDashboard() {
             title="COGS"
             value={formatCurrency(metrics.cogs)}
             icon={Package}
-            color="#2E8B99"
+            color="#14524B"
             trend="-3%"
           />
           <MetricCard
@@ -89,7 +89,7 @@ export default function ManagerDashboard() {
             title="Margin %"
             value={`${metrics.marginPercent}%`}
             icon={TrendingUp}
-            color="#2E8B99"
+            color="#14524B"
             trend="+2%"
           />
         </div>
@@ -142,8 +142,8 @@ export default function ManagerDashboard() {
                 {losses.map((loss, idx) => (
                   <div key={idx} className="border-l-2 border-l-gray-300 pl-3">
                     <p className="font-corp-body font-semibold text-sm">{loss.item}</p>
-                    <p className="text-xs text-gray-600">{loss.quantity}x • {loss.reason}</p>
-                    <p className="text-sm font-corp-mono text-red-600">{formatCurrency(loss.value)}</p>
+                    <p className="text-xs text-muted-foreground">{loss.quantity}x • {loss.reason}</p>
+                    <p className="text-sm font-corp-mono text-destructive">{formatCurrency(loss.value)}</p>
                   </div>
                 ))}
               </div>
@@ -176,8 +176,8 @@ export default function ManagerDashboard() {
                     <TableCell>
                       <span className={`text-xs px-2 py-1 rounded ${
                         emp.status === 'On Time'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-yellow-100 text-yellow-800'
+                          ? 'bg-success-bg text-success'
+                          : 'bg-warning-bg text-warning'
                       }`}>
                         {emp.status}
                       </span>
@@ -200,9 +200,9 @@ function MetricCard({ title, value, icon: Icon, color, trend }: any) {
       <CardContent className="p-4">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs text-gray-600 font-corp-body mb-1">{title}</p>
+            <p className="text-xs text-muted-foreground font-corp-body mb-1">{title}</p>
             <p className="text-2xl font-corp-display font-bold">{value}</p>
-            <p className="text-xs text-green-600 mt-1">{trend}</p>
+            <p className="text-xs text-success mt-1">{trend}</p>
           </div>
           <Icon className="w-8 h-8 opacity-20" style={{ color }} />
         </div>

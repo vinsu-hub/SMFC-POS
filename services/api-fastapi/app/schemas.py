@@ -81,3 +81,55 @@ class LossRecordResponse(BaseModel):
     cost_impact: float
     photo_url: str | None = None
     created_at: datetime
+
+
+class HourlyRevenuePoint(BaseModel):
+    hour: int
+    revenue: float
+
+
+class BranchSummary(BaseModel):
+    branch_id: str
+    branch_name: str
+    revenue: float
+    cogs: float
+    losses: float
+    margin: float
+    margin_percent: float
+    hourly_revenue: list[HourlyRevenuePoint]
+
+
+class OrganizationSummary(BaseModel):
+    organization_id: str
+    branches: list[BranchSummary]
+    total_revenue: float
+    total_cogs: float
+    total_losses: float
+    total_margin: float
+    total_margin_percent: float
+    hourly_revenue: list[HourlyRevenuePoint]
+
+
+class MalayaQueryRequest(BaseModel):
+    question: str
+
+
+class MalayaChartPoint(BaseModel):
+    label: str
+    value: float
+
+
+class MalayaChartSeries(BaseModel):
+    name: str
+    data: list[MalayaChartPoint]
+
+
+class MalayaChartSpec(BaseModel):
+    type: Literal["bar", "line"]
+    title: str
+    series: list[MalayaChartSeries]
+
+
+class MalayaQueryResponse(BaseModel):
+    answer: str
+    chart: MalayaChartSpec | None = None

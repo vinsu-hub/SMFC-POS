@@ -252,15 +252,15 @@ export default function Newsfeed() {
   const getTypeColor = (type: string) => {
     switch (type) {
       case 'expiry_urgent':
-        return 'bg-red-100 text-red-800';
+        return 'bg-error-bg text-destructive';
       case 'expiry':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-warning-bg text-warning';
       case 'low_stock':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-warning-bg text-warning';
       case 'hr':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-accent-soft text-accent-foreground';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-secondary text-foreground';
     }
   };
 
@@ -300,8 +300,8 @@ export default function Newsfeed() {
       <CardContent className="pt-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs text-gray-600 font-corp-body mb-1">{title}</p>
-            <p className="text-2xl font-corp-display font-bold text-gray-900">{value}</p>
+            <p className="text-xs text-muted-foreground font-corp-body mb-1">{title}</p>
+            <p className="text-2xl font-corp-display font-bold text-foreground">{value}</p>
           </div>
           <Icon className="w-8 h-8" style={{ color }} />
         </div>
@@ -313,7 +313,7 @@ export default function Newsfeed() {
     <DashboardLayout title="Newsfeed">
       <div className="p-6 space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full gap-2 bg-gray-100 mb-6" style={{ gridTemplateColumns: `repeat(${user?.role === 'executive' ? 4 : user?.role === 'manager' ? 2 : 1}, 1fr)` }}>
+          <TabsList className="grid w-full gap-2 mb-6" style={{ gridTemplateColumns: `repeat(${user?.role === 'executive' ? 4 : user?.role === 'manager' ? 2 : 1}, 1fr)` }}>
             <TabsTrigger value="alerts" className="font-corp-body">
               Alerts & Updates
             </TabsTrigger>
@@ -344,14 +344,14 @@ export default function Newsfeed() {
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-corp-display font-semibold text-gray-900">
+                      <h3 className="font-corp-display font-semibold text-foreground">
                         {userBranchMetrics.name}
                       </h3>
-                      <p className="text-sm text-gray-600 font-corp-body">Branch alerts and updates</p>
+                      <p className="text-sm text-muted-foreground font-corp-body">Branch alerts and updates</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-corp-display font-bold text-gray-900">{expiryItems.length}</p>
-                      <p className="text-xs text-gray-600 font-corp-body">Items expiring soon</p>
+                      <p className="text-2xl font-corp-display font-bold text-foreground">{expiryItems.length}</p>
+                      <p className="text-xs text-muted-foreground font-corp-body">Items expiring soon</p>
                     </div>
                   </div>
                 </CardContent>
@@ -360,7 +360,7 @@ export default function Newsfeed() {
 
             {/* Filter Tabs */}
             <Tabs defaultValue="all" onValueChange={setSelectedFilter} className="w-full">
-              <TabsList className="grid w-full grid-cols-5 bg-gray-100">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="all" className="font-corp-body text-xs">
                   All ({filteredItems.length})
                 </TabsTrigger>
@@ -382,8 +382,8 @@ export default function Newsfeed() {
                 {filteredItems.length === 0 ? (
                   <Card>
                     <CardContent className="pt-8 text-center">
-                      <Info className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-600 font-corp-body">No updates at this time</p>
+                      <Info className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+                      <p className="text-muted-foreground font-corp-body">No updates at this time</p>
                     </CardContent>
                   </Card>
                 ) : (
@@ -396,25 +396,25 @@ export default function Newsfeed() {
                       <CardContent className="pt-4">
                         <div className="flex items-start gap-4">
                           <div className="mt-1">
-                            <item.icon className="w-5 h-5 text-gray-600" />
+                            <item.icon className="w-5 h-5 text-muted-foreground" />
                           </div>
                           <div className="flex-1">
                             <div className="flex items-start justify-between mb-2">
                               <div>
-                                <h4 className="font-corp-display font-semibold text-gray-900">{item.title}</h4>
-                                <p className="text-xs text-gray-600 font-corp-body">{item.branchName}</p>
+                                <h4 className="font-corp-display font-semibold text-foreground">{item.title}</h4>
+                                <p className="text-xs text-muted-foreground font-corp-body">{item.branchName}</p>
                               </div>
                               <Badge className={getTypeColor(item.type)}>
                                 {getTypeLabel(item.type)}
                               </Badge>
                             </div>
-                            <p className="text-sm text-gray-700 font-corp-body mb-3">{item.message}</p>
+                            <p className="text-sm text-foreground font-corp-body mb-3">{item.message}</p>
                             <div className="flex items-center justify-between">
-                              <p className="text-xs text-gray-500 font-corp-body">{formatTime(item.timestamp)}</p>
+                              <p className="text-xs text-muted-foreground font-corp-body">{formatTime(item.timestamp)}</p>
                               {item.daysUntilExpiry && (
                                 <div className="flex items-center gap-1 text-xs font-corp-body">
                                   <Clock className="w-3 h-3" />
-                                  <span className={item.daysUntilExpiry === 1 ? 'text-red-600 font-semibold' : 'text-orange-600'}>
+                                  <span className={item.daysUntilExpiry === 1 ? 'text-destructive font-semibold' : 'text-warning'}>
                                     {item.daysUntilExpiry} day{item.daysUntilExpiry > 1 ? 's' : ''} left
                                   </span>
                                 </div>
@@ -432,31 +432,31 @@ export default function Newsfeed() {
                 {expiryItems.filter((i) => i.type === 'expiry_urgent').length === 0 ? (
                   <Card>
                     <CardContent className="pt-8 text-center">
-                      <Info className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-600 font-corp-body">No urgent expiry alerts</p>
+                      <Info className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+                      <p className="text-muted-foreground font-corp-body">No urgent expiry alerts</p>
                     </CardContent>
                   </Card>
                 ) : (
                   expiryItems
                     .filter((i) => i.type === 'expiry_urgent')
                     .map((item) => (
-                      <Card key={item.id} className="border-l-4 border-red-500 bg-red-50">
+                      <Card key={item.id} className="border-l-4 border-destructive bg-error-bg">
                         <CardContent className="pt-4">
                           <div className="flex items-start gap-4">
-                            <AlertTriangle className="w-5 h-5 text-red-600 mt-1" />
+                            <AlertTriangle className="w-5 h-5 text-destructive mt-1" />
                             <div className="flex-1">
                               <div className="flex items-start justify-between mb-2">
                                 <div>
-                                  <h4 className="font-corp-display font-semibold text-gray-900">{item.title}</h4>
-                                  <p className="text-xs text-gray-600 font-corp-body">{item.branchName}</p>
+                                  <h4 className="font-corp-display font-semibold text-foreground">{item.title}</h4>
+                                  <p className="text-xs text-muted-foreground font-corp-body">{item.branchName}</p>
                                 </div>
-                                <Badge className="bg-red-100 text-red-800">URGENT</Badge>
+                                <Badge className="bg-error-bg text-destructive">URGENT</Badge>
                               </div>
-                              <p className="text-sm text-gray-700 font-corp-body mb-3">{item.message}</p>
+                              <p className="text-sm text-foreground font-corp-body mb-3">{item.message}</p>
                               <div className="flex items-center justify-between">
-                                <p className="text-xs text-gray-500 font-corp-body">{formatTime(item.timestamp)}</p>
+                                <p className="text-xs text-muted-foreground font-corp-body">{formatTime(item.timestamp)}</p>
                                 {item.daysUntilExpiry && (
-                                  <div className="flex items-center gap-1 text-xs font-corp-body font-semibold text-red-600">
+                                  <div className="flex items-center gap-1 text-xs font-corp-body font-semibold text-destructive">
                                     <Clock className="w-3 h-3" />
                                     {item.daysUntilExpiry} day{item.daysUntilExpiry > 1 ? 's' : ''} left
                                   </div>
@@ -474,31 +474,31 @@ export default function Newsfeed() {
                 {expiryItems.filter((i) => i.type === 'expiry').length === 0 ? (
                   <Card>
                     <CardContent className="pt-8 text-center">
-                      <Info className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-600 font-corp-body">No expiry alerts</p>
+                      <Info className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+                      <p className="text-muted-foreground font-corp-body">No expiry alerts</p>
                     </CardContent>
                   </Card>
                 ) : (
                   expiryItems
                     .filter((i) => i.type === 'expiry')
                     .map((item) => (
-                      <Card key={item.id} className="border-l-4 border-orange-500" style={{ borderLeftColor: item.branchColor }}>
+                      <Card key={item.id} className="border-l-4 border-warning" style={{ borderLeftColor: item.branchColor }}>
                         <CardContent className="pt-4">
                           <div className="flex items-start gap-4">
-                            <AlertTriangle className="w-5 h-5 text-orange-600 mt-1" />
+                            <AlertTriangle className="w-5 h-5 text-warning mt-1" />
                             <div className="flex-1">
                               <div className="flex items-start justify-between mb-2">
                                 <div>
-                                  <h4 className="font-corp-display font-semibold text-gray-900">{item.title}</h4>
-                                  <p className="text-xs text-gray-600 font-corp-body">{item.branchName}</p>
+                                  <h4 className="font-corp-display font-semibold text-foreground">{item.title}</h4>
+                                  <p className="text-xs text-muted-foreground font-corp-body">{item.branchName}</p>
                                 </div>
-                                <Badge className="bg-orange-100 text-orange-800">EXPIRY</Badge>
+                                <Badge className="bg-warning-bg text-warning">EXPIRY</Badge>
                               </div>
-                              <p className="text-sm text-gray-700 font-corp-body mb-3">{item.message}</p>
+                              <p className="text-sm text-foreground font-corp-body mb-3">{item.message}</p>
                               <div className="flex items-center justify-between">
-                                <p className="text-xs text-gray-500 font-corp-body">{formatTime(item.timestamp)}</p>
+                                <p className="text-xs text-muted-foreground font-corp-body">{formatTime(item.timestamp)}</p>
                                 {item.daysUntilExpiry && (
-                                  <div className="flex items-center gap-1 text-xs font-corp-body text-orange-600">
+                                  <div className="flex items-center gap-1 text-xs font-corp-body text-warning">
                                     <Clock className="w-3 h-3" />
                                     {item.daysUntilExpiry} day{item.daysUntilExpiry > 1 ? 's' : ''} left
                                   </div>
@@ -516,8 +516,8 @@ export default function Newsfeed() {
                 {lowStockItems.length === 0 ? (
                   <Card>
                     <CardContent className="pt-8 text-center">
-                      <Info className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-600 font-corp-body">No low stock alerts</p>
+                      <Info className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+                      <p className="text-muted-foreground font-corp-body">No low stock alerts</p>
                     </CardContent>
                   </Card>
                 ) : (
@@ -525,17 +525,17 @@ export default function Newsfeed() {
                     <Card key={item.id} className="border-l-4" style={{ borderLeftColor: item.branchColor }}>
                       <CardContent className="pt-4">
                         <div className="flex items-start gap-4">
-                          <Package className="w-5 h-5 text-yellow-600 mt-1" />
+                          <Package className="w-5 h-5 text-warning mt-1" />
                           <div className="flex-1">
                             <div className="flex items-start justify-between mb-2">
                               <div>
-                                <h4 className="font-corp-display font-semibold text-gray-900">{item.title}</h4>
-                                <p className="text-xs text-gray-600 font-corp-body">{item.branchName}</p>
+                                <h4 className="font-corp-display font-semibold text-foreground">{item.title}</h4>
+                                <p className="text-xs text-muted-foreground font-corp-body">{item.branchName}</p>
                               </div>
-                              <Badge className="bg-yellow-100 text-yellow-800">LOW STOCK</Badge>
+                              <Badge className="bg-warning-bg text-warning">LOW STOCK</Badge>
                             </div>
-                            <p className="text-sm text-gray-700 font-corp-body mb-3">{item.message}</p>
-                            <p className="text-xs text-gray-500 font-corp-body">{formatTime(item.timestamp)}</p>
+                            <p className="text-sm text-foreground font-corp-body mb-3">{item.message}</p>
+                            <p className="text-xs text-muted-foreground font-corp-body">{formatTime(item.timestamp)}</p>
                           </div>
                         </div>
                       </CardContent>
@@ -548,8 +548,8 @@ export default function Newsfeed() {
                 {hrItems.length === 0 ? (
                   <Card>
                     <CardContent className="pt-8 text-center">
-                      <Info className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                      <p className="text-gray-600 font-corp-body">No staff updates</p>
+                      <Info className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+                      <p className="text-muted-foreground font-corp-body">No staff updates</p>
                     </CardContent>
                   </Card>
                 ) : (
@@ -557,17 +557,17 @@ export default function Newsfeed() {
                     <Card key={item.id} className="border-l-4" style={{ borderLeftColor: item.branchColor }}>
                       <CardContent className="pt-4">
                         <div className="flex items-start gap-4">
-                          <Users className="w-5 h-5 text-blue-600 mt-1" />
+                          <Users className="w-5 h-5 text-accent-foreground mt-1" />
                           <div className="flex-1">
                             <div className="flex items-start justify-between mb-2">
                               <div>
-                                <h4 className="font-corp-display font-semibold text-gray-900">{item.title}</h4>
-                                <p className="text-xs text-gray-600 font-corp-body">{item.branchName}</p>
+                                <h4 className="font-corp-display font-semibold text-foreground">{item.title}</h4>
+                                <p className="text-xs text-muted-foreground font-corp-body">{item.branchName}</p>
                               </div>
-                              <Badge className="bg-blue-100 text-blue-800">STAFF</Badge>
+                              <Badge className="bg-accent-soft text-accent-foreground">STAFF</Badge>
                             </div>
-                            <p className="text-sm text-gray-700 font-corp-body mb-3">{item.message}</p>
-                            <p className="text-xs text-gray-500 font-corp-body">{formatTime(item.timestamp)}</p>
+                            <p className="text-sm text-foreground font-corp-body mb-3">{item.message}</p>
+                            <p className="text-xs text-muted-foreground font-corp-body">{formatTime(item.timestamp)}</p>
                           </div>
                         </div>
                       </CardContent>
@@ -600,13 +600,13 @@ export default function Newsfeed() {
                   title="Weekly Trend"
                   value={userBranchMetrics.weeklyTrend}
                   icon={TrendingUp}
-                  color="#22C55E"
+                  color="#1E7A4C"
                 />
                 <MetricCard
                   title="Staff Count"
                   value={`${userBranchMetrics.staffCount}`}
                   icon={Users}
-                  color="#3B82F6"
+                  color="#14524B"
                 />
                 <MetricCard
                   title="Margin %"
@@ -625,19 +625,19 @@ export default function Newsfeed() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center justify-between py-2 border-b">
-                      <span className="text-gray-700 font-corp-body">Total Revenue</span>
+                      <span className="text-foreground font-corp-body">Total Revenue</span>
                       <span className="font-corp-display font-bold">{formatCurrency(userBranchMetrics.revenue)}</span>
                     </div>
                     <div className="flex items-center justify-between py-2 border-b">
-                      <span className="text-gray-700 font-corp-body">COGS</span>
+                      <span className="text-foreground font-corp-body">COGS</span>
                       <span className="font-corp-display font-bold">{formatCurrency(userBranchMetrics.cogs)}</span>
                     </div>
                     <div className="flex items-center justify-between py-2 border-b">
-                      <span className="text-gray-700 font-corp-body">Losses</span>
-                      <span className="font-corp-display font-bold text-red-600">{formatCurrency(userBranchMetrics.losses)}</span>
+                      <span className="text-foreground font-corp-body">Losses</span>
+                      <span className="font-corp-display font-bold text-destructive">{formatCurrency(userBranchMetrics.losses)}</span>
                     </div>
-                    <div className="flex items-center justify-between py-2 bg-gray-50 px-3 rounded">
-                      <span className="text-gray-700 font-corp-body font-semibold">Gross Margin</span>
+                    <div className="flex items-center justify-between py-2 bg-secondary px-3 rounded">
+                      <span className="text-foreground font-corp-body font-semibold">Gross Margin</span>
                       <span className="font-corp-display font-bold text-lg" style={{ color: userBranchMetrics.color }}>
                         {formatCurrency(userBranchMetrics.margin)}
                       </span>
@@ -652,9 +652,9 @@ export default function Newsfeed() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center justify-between py-2 border-b">
-                      <span className="text-gray-700 font-corp-body">Staff Utilization</span>
+                      <span className="text-foreground font-corp-body">Staff Utilization</span>
                       <div className="flex items-center gap-2">
-                        <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div className="w-24 h-2 bg-secondary rounded-full overflow-hidden">
                           <div
                             className="h-full rounded-full"
                             style={{
@@ -669,19 +669,19 @@ export default function Newsfeed() {
                       </div>
                     </div>
                     <div className="flex items-center justify-between py-2 border-b">
-                      <span className="text-gray-700 font-corp-body">Expiring Items</span>
-                      <span className="font-corp-display font-bold text-orange-600">{userBranchMetrics.expiringItems}</span>
+                      <span className="text-foreground font-corp-body">Expiring Items</span>
+                      <span className="font-corp-display font-bold text-warning">{userBranchMetrics.expiringItems}</span>
                     </div>
                     <div className="flex items-center justify-between py-2 border-b">
-                      <span className="text-gray-700 font-corp-body">Low Stock Items</span>
-                      <span className="font-corp-display font-bold text-yellow-600">{userBranchMetrics.lowStockItems}</span>
+                      <span className="text-foreground font-corp-body">Low Stock Items</span>
+                      <span className="font-corp-display font-bold text-warning">{userBranchMetrics.lowStockItems}</span>
                     </div>
                     <div className="flex items-center justify-between py-2">
-                      <span className="text-gray-700 font-corp-body flex items-center gap-2">
+                      <span className="text-foreground font-corp-body flex items-center gap-2">
                         <Clock className="w-4 h-4" />
                         Last Inventory
                       </span>
-                      <span className="font-corp-body text-sm text-gray-600">{userBranchMetrics.lastInventoryCount}</span>
+                      <span className="font-corp-body text-sm text-muted-foreground">{userBranchMetrics.lastInventoryCount}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -695,21 +695,21 @@ export default function Newsfeed() {
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-xs text-gray-600 font-corp-body mb-2">Today's Sales</p>
-                      <p className="text-2xl font-corp-display font-bold text-gray-900">
+                      <p className="text-xs text-muted-foreground font-corp-body mb-2">Today's Sales</p>
+                      <p className="text-2xl font-corp-display font-bold text-foreground">
                         {formatCurrency(userBranchMetrics.todaysSales)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-600 font-corp-body mb-2">Yesterday's Sales</p>
-                      <p className="text-2xl font-corp-display font-bold text-gray-600">
+                      <p className="text-xs text-muted-foreground font-corp-body mb-2">Yesterday's Sales</p>
+                      <p className="text-2xl font-corp-display font-bold text-muted-foreground">
                         {formatCurrency(userBranchMetrics.yesterdaysSales)}
                       </p>
                     </div>
                   </div>
-                  <div className="bg-gray-50 p-4 rounded">
-                    <p className="text-sm text-gray-700 font-corp-body mb-1">Weekly Trend</p>
-                    <p className="text-3xl font-corp-display font-bold text-green-600">{userBranchMetrics.weeklyTrend}</p>
+                  <div className="bg-secondary p-4 rounded">
+                    <p className="text-sm text-foreground font-corp-body mb-1">Weekly Trend</p>
+                    <p className="text-3xl font-corp-display font-bold text-success">{userBranchMetrics.weeklyTrend}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -740,13 +740,13 @@ export default function Newsfeed() {
                       title="Weekly Trend"
                       value={branch.weeklyTrend}
                       icon={TrendingUp}
-                      color="#22C55E"
+                      color="#1E7A4C"
                     />
                     <MetricCard
                       title="Staff Count"
                       value={`${branch.staffCount}`}
                       icon={Users}
-                      color="#3B82F6"
+                      color="#14524B"
                     />
                     <MetricCard
                       title="Margin %"
@@ -765,19 +765,19 @@ export default function Newsfeed() {
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <div className="flex items-center justify-between py-2 border-b">
-                          <span className="text-gray-700 font-corp-body">Total Revenue</span>
+                          <span className="text-foreground font-corp-body">Total Revenue</span>
                           <span className="font-corp-display font-bold">{formatCurrency(branch.revenue)}</span>
                         </div>
                         <div className="flex items-center justify-between py-2 border-b">
-                          <span className="text-gray-700 font-corp-body">COGS</span>
+                          <span className="text-foreground font-corp-body">COGS</span>
                           <span className="font-corp-display font-bold">{formatCurrency(branch.cogs)}</span>
                         </div>
                         <div className="flex items-center justify-between py-2 border-b">
-                          <span className="text-gray-700 font-corp-body">Losses</span>
-                          <span className="font-corp-display font-bold text-red-600">{formatCurrency(branch.losses)}</span>
+                          <span className="text-foreground font-corp-body">Losses</span>
+                          <span className="font-corp-display font-bold text-destructive">{formatCurrency(branch.losses)}</span>
                         </div>
-                        <div className="flex items-center justify-between py-2 bg-gray-50 px-3 rounded">
-                          <span className="text-gray-700 font-corp-body font-semibold">Gross Margin</span>
+                        <div className="flex items-center justify-between py-2 bg-secondary px-3 rounded">
+                          <span className="text-foreground font-corp-body font-semibold">Gross Margin</span>
                           <span className="font-corp-display font-bold text-lg" style={{ color: branch.color }}>
                             {formatCurrency(branch.margin)}
                           </span>
@@ -792,9 +792,9 @@ export default function Newsfeed() {
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <div className="flex items-center justify-between py-2 border-b">
-                          <span className="text-gray-700 font-corp-body">Staff Utilization</span>
+                          <span className="text-foreground font-corp-body">Staff Utilization</span>
                           <div className="flex items-center gap-2">
-                            <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="w-24 h-2 bg-secondary rounded-full overflow-hidden">
                               <div
                                 className="h-full rounded-full"
                                 style={{
@@ -809,19 +809,19 @@ export default function Newsfeed() {
                           </div>
                         </div>
                         <div className="flex items-center justify-between py-2 border-b">
-                          <span className="text-gray-700 font-corp-body">Expiring Items</span>
-                          <span className="font-corp-display font-bold text-orange-600">{branch.expiringItems}</span>
+                          <span className="text-foreground font-corp-body">Expiring Items</span>
+                          <span className="font-corp-display font-bold text-warning">{branch.expiringItems}</span>
                         </div>
                         <div className="flex items-center justify-between py-2 border-b">
-                          <span className="text-gray-700 font-corp-body">Low Stock Items</span>
-                          <span className="font-corp-display font-bold text-yellow-600">{branch.lowStockItems}</span>
+                          <span className="text-foreground font-corp-body">Low Stock Items</span>
+                          <span className="font-corp-display font-bold text-warning">{branch.lowStockItems}</span>
                         </div>
                         <div className="flex items-center justify-between py-2">
-                          <span className="text-gray-700 font-corp-body flex items-center gap-2">
+                          <span className="text-foreground font-corp-body flex items-center gap-2">
                             <Clock className="w-4 h-4" />
                             Last Inventory
                           </span>
-                          <span className="font-corp-body text-sm text-gray-600">{branch.lastInventoryCount}</span>
+                          <span className="font-corp-body text-sm text-muted-foreground">{branch.lastInventoryCount}</span>
                         </div>
                       </CardContent>
                     </Card>
@@ -835,21 +835,21 @@ export default function Newsfeed() {
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <p className="text-xs text-gray-600 font-corp-body mb-2">Today's Sales</p>
-                          <p className="text-2xl font-corp-display font-bold text-gray-900">
+                          <p className="text-xs text-muted-foreground font-corp-body mb-2">Today's Sales</p>
+                          <p className="text-2xl font-corp-display font-bold text-foreground">
                             {formatCurrency(branch.todaysSales)}
                           </p>
                         </div>
                         <div>
-                          <p className="text-xs text-gray-600 font-corp-body mb-2">Yesterday's Sales</p>
-                          <p className="text-2xl font-corp-display font-bold text-gray-600">
+                          <p className="text-xs text-muted-foreground font-corp-body mb-2">Yesterday's Sales</p>
+                          <p className="text-2xl font-corp-display font-bold text-muted-foreground">
                             {formatCurrency(branch.yesterdaysSales)}
                           </p>
                         </div>
                       </div>
-                      <div className="bg-gray-50 p-4 rounded">
-                        <p className="text-sm text-gray-700 font-corp-body mb-1">Weekly Trend</p>
-                        <p className="text-3xl font-corp-display font-bold text-green-600">{branch.weeklyTrend}</p>
+                      <div className="bg-secondary p-4 rounded">
+                        <p className="text-sm text-foreground font-corp-body mb-1">Weekly Trend</p>
+                        <p className="text-3xl font-corp-display font-bold text-success">{branch.weeklyTrend}</p>
                       </div>
                     </CardContent>
                   </Card>

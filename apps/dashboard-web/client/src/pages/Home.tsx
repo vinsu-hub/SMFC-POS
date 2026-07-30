@@ -25,10 +25,10 @@ export default function Home() {
   }, [isAuthenticated, user, loading, navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-secondary">
       <div className="text-center">
-        <div className="w-12 h-12 border-4 border-gray-200 border-t-[#1B2A4A] rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-gray-600 font-corp-body">Loading...</p>
+        <div className="w-12 h-12 border-4 border-border border-t-primary rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-muted-foreground font-corp-body">Loading...</p>
       </div>
     </div>
   );

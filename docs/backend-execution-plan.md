@@ -31,16 +31,16 @@ Tauri POS (per branch)                    React Dashboard (Manager/Exec)
                                     │        ▲
                      RLS-scoped     │        │  writes (alerts, digests)
                      reads/writes   ▼        │
-                              FastAPI (Oracle VM) ──────► n8n (Oracle VM)
+                              FastAPI (Vercel) ──────► scheduled jobs (mechanism TBD, see §6)
                                     │                          │
                                     ▼                          ▼
-                              ChromaDB + Groq            Slack / Zoho Mail
-                              ("Malaya" AI)               (newsfeed delivery)
+                              ChromaDB + Groq            newsfeed_items
+                              ("Malaya" AI)               (in-app only — no external delivery)
 ```
 
 - **Auth is one path for everyone.** Supabase Auth issues a JWT on login; the Tauri POS, the React dashboard, and FastAPI all validate against the same token. Role and branch live on the `profiles` table, and Postgres Row-Level Security enforces the Employee/Manager/Executive scoping at the database layer — so even a bug in frontend routing can't leak another branch's data.
 - **FastAPI is the only thing that talks to Groq and ChromaDB.** Neither the POS nor the dashboard ever calls the AI layer directly; they call FastAPI's `/malaya/*` routes, keeping the API key and retrieval logic server-side.
-- **n8n listens, it doesn't own data.** It reacts to Postgres events/webhooks and writes back into `newsfeed_items` and `hr_flags` — the automation layer, not a second source of truth.
+- **The automation layer listens, it doesn't own data.** Whatever ends up triggering alerts reacts to Postgres events/webhooks and writes back into `newsfeed_items` and `hr_flags` — an automation layer, not a second source of truth. n8n was the originally planned engine for this; it's dropped (see §6 and the build decisions log).
 
 ---
 
@@ -60,7 +60,7 @@ Tauri POS (per branch)                    React Dashboard (Manager/Exec)
 | `attendance_logs` | `id`, `employee_id`, `branch_id`, `clock_in`, `clock_out`, `status` (on_time/late/absent) | Feeds the HR flag engine |
 | `hr_flags` | `id`, `employee_id`, `branch_id`, `pattern_type` (lateness/absence), `description`, `resolved` | `description` is Malaya's plain-language narration, not a raw code |
 | `daily_summaries` | `id`, `branch_id`, `date`, `revenue`, `cogs`, `losses`, `margin`, `units_sold` | The EOD compile — one row per branch per day |
-| `newsfeed_items` | `id`, `branch_id` (nullable = corp-wide), `type` (expiry/low_stock/hr/general), `message`, `severity` | Written mostly by n8n, read by every dashboard |
+| `newsfeed_items` | `id`, `branch_id` (nullable = corp-wide), `type` (expiry/low_stock/hr/general), `message`, `severity` | Written by scheduled automation jobs (mechanism TBD, see §6), read by every dashboard |
 | `malaya_query_log` | `id`, `user_id`, `question`, `answer`, `created_at` | Audit trail for what Malaya was asked and answered |
 
 `ChromaDB` sits outside Postgres entirely — it holds embedded daily summaries, product history, and HR pattern text so Malaya can retrieve by meaning, not just by exact SQL filter.
@@ -116,13 +116,22 @@ If a screen in the UI/UX plan needs a field that isn't in §2, that's a signal t
 > decisions log at the bottom of this file. Do not build n8n workflows
 > against this schema; treat the table below as a statement of *what* needs
 > to trigger, not *how*.
+>
+> **Update (2026-07-31): external delivery is dropped, not deferred.** Slack
+> and Zoho Mail were the originally planned delivery channels; both are now
+> out of scope entirely, same treatment as n8n. SMS was never specified
+> anywhere in this plan and shouldn't be treated as scope either — the
+> Settings UI toggle for it was a frontend-only artifact with nothing behind
+> it and has been removed. All triggers below land in `newsfeed_items` only
+> and are read in-app; there is no external delivery channel until a real
+> need for one is scoped.
 
 | Trigger | What still needs to happen |
 |---|---|
-| `ingredients.expiry_date` within threshold | Insert `newsfeed_items` (type=expiry); Slack/Zoho Mail delivery deferred regardless of automation engine chosen |
-| `ingredients.current_stock` < `reorder_threshold` | Insert `newsfeed_items` (type=low_stock); notify branch manager |
-| Nightly | Compute HR attendance patterns → insert `hr_flags` → notify manager/exec |
-| Nightly | Compile `daily_summaries` per branch → EOD digest (email delivery deferred) |
+| `ingredients.expiry_date` within threshold | Insert `newsfeed_items` (type=expiry), in-app only |
+| `ingredients.current_stock` < `reorder_threshold` | Insert `newsfeed_items` (type=low_stock); notify branch manager, in-app only |
+| Nightly | Compute HR attendance patterns → insert `hr_flags` → notify manager/exec, in-app only |
+| Nightly | Compile `daily_summaries` per branch → in-app daily digest on the dashboard |
 
 ---
 
@@ -169,7 +178,7 @@ saint-michael-system/
 13. Wire the AI Panel and Trend Analysis screens to these endpoints.
 
 **Phase 5 — Automation & mobile**
-14. Build the automation triggers in §6 (expiry/low-stock alerts, HR flagging job, EOD digest) via scheduled FastAPI endpoints instead of n8n; connect Slack/Zoho Mail delivery later.
+14. Build the automation triggers in §6 (expiry/low-stock alerts, HR flagging job, EOD digest) via scheduled FastAPI endpoints instead of n8n. In-app (`newsfeed_items`) delivery only — no external channel to wire.
 15. Build the `hr_flags` UI.
 16. Scope and build the iOS companion app against the same FastAPI endpoints already in place — no new backend work should be needed here if §3 was followed correctly.
 
@@ -183,8 +192,6 @@ SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SECRET_KEY=             # FastAPI only, never shipped to POS/dashboard
 GROQ_API_KEY=
 CHROMA_PATH=                     # or CHROMA_URL if hosted separately
-ZOHO_MAIL_SMTP_CREDENTIALS=
-SLACK_WEBHOOK_URL=
 ```
 
 ---
@@ -215,5 +222,6 @@ worker stub. Do not begin Phase 2 until Phase 1's deduction test passes.
 - **Tauri deferred.** The existing repo already ships POS Terminal as a web page (`client/src/pages/POSTerminal.tsx`, now themed per-branch). Phase 1 wired that page to the real backend instead of scaffolding `apps/pos-tauri` immediately. Tauri shell comes later, still not started.
 - **Supabase is hosted, not local.** Docker/WSL2 aren't available on this dev machine (no admin rights in this session), so `supabase start` (local Docker-based stack) isn't an option. Using a hosted Supabase.com project instead — same environment production will use anyway.
 - **n8n is dropped entirely (2026-07-30).** Not deferred — excluded. The automation layer (§6) needs a different mechanism; nothing has been built for it yet. This also removes the Oracle VM as a requirement for hosting the automation layer specifically, though see the next point — it was never used for the API either.
+- **Slack and Zoho Mail delivery dropped entirely (2026-07-31).** Same treatment as n8n — not deferred, excluded. All automation triggers (§6) land in `newsfeed_items` and are read in-app; no external delivery channel is planned until a real need is scoped. Removed `ZOHO_MAIL_SMTP_CREDENTIALS` and `SLACK_WEBHOOK_URL` from the env checklist (§9) accordingly. Removed the entire "Delivery Method" card (Email + SMS toggles) from the Settings UI — with no external channel in scope, there's nothing for a delivery-method preference to control; "Alert Preferences" (which alert types show up in the in-app Newsfeed) is the only notification setting that still means anything.
 - **`services/api-fastapi` is deployed on Vercel, not the Oracle Always Free VM the tech plan assumed.** Both `apps/dashboard-web` and `services/api-fastapi` are separate Vercel projects (`smfc-ims` and `smfc-api`), the latter as a Python/ASGI serverless function. This was simpler than provisioning and maintaining an Oracle VM for a project already using Vercel for the frontend, and keeps both deploys on one platform/one `vercel` CLI auth. Revisit if a real always-on process (e.g. background workers, WebSocket/Realtime consumers) is needed later — serverless functions don't hold long-running state between requests.
 - **RLS is partial.** Only `profiles`, `branches`, and the `loss-photos` storage bucket have RLS policies. `products`, `ingredients`, `recipe_items`, `transactions`, `transaction_items`, and `loss_records` are still open to the anon/publishable key at the database level — access to them is enforced only in `services/api-fastapi/app/auth.py` (branch/role scoping on every route), not by Postgres RLS. Anyone bypassing the API and calling Supabase's REST endpoint directly with the publishable key could currently read/write those tables. Full RLS parity with the auth layer is still open work.

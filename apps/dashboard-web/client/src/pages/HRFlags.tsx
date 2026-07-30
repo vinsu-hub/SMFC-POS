@@ -12,7 +12,7 @@ export default function HRFlags() {
     return (
       <DashboardLayout>
         <div className="p-6 text-center">
-          <p className="text-red-600">Access denied. This page is for executives only.</p>
+          <p className="text-destructive">Access denied. This page is for executives only.</p>
         </div>
       </DashboardLayout>
     );
@@ -115,13 +115,13 @@ export default function HRFlags() {
   const getStatusDot = (status: string) => {
     switch (status) {
       case 'on-time':
-        return <div className="w-3 h-3 rounded-full bg-green-500" />;
+        return <div className="w-3 h-3 rounded-full bg-success" />;
       case 'late':
-        return <div className="w-3 h-3 rounded-full bg-yellow-500" />;
+        return <div className="w-3 h-3 rounded-full bg-warning" />;
       case 'absent':
-        return <div className="w-3 h-3 rounded-full bg-red-500" />;
+        return <div className="w-3 h-3 rounded-full bg-destructive" />;
       default:
-        return <div className="w-3 h-3 rounded-full bg-gray-300" />;
+        return <div className="w-3 h-3 rounded-full bg-muted-foreground/50" />;
     }
   };
 
@@ -143,7 +143,7 @@ export default function HRFlags() {
       <div className="p-6 space-y-6">
         {/* Active Flags */}
         <div>
-          <h2 className="text-xl font-corp-display font-semibold text-gray-900 mb-4">
+          <h2 className="text-xl font-corp-display font-semibold text-foreground mb-4">
             Active Flags
           </h2>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -157,15 +157,15 @@ export default function HRFlags() {
                 >
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
-                      <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                      <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
                       <div className="flex-1">
-                        <h3 className="font-corp-display font-semibold text-gray-900">
+                        <h3 className="font-corp-display font-semibold text-foreground">
                           {flag.employeeName}
                         </h3>
-                        <p className="text-xs text-gray-500 font-corp-body mb-2">
+                        <p className="text-xs text-muted-foreground font-corp-body mb-2">
                           {flag.branch}
                         </p>
-                        <p className="text-sm font-corp-body text-gray-700 mb-3">
+                        <p className="text-sm font-corp-body text-foreground mb-3">
                           {flag.description}
                         </p>
                         <div className="flex items-center justify-between">
@@ -177,7 +177,7 @@ export default function HRFlags() {
                           >
                             {flag.flagType.replace('_', ' ')}
                           </Badge>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-muted-foreground">
                             {flag.timestamp.toLocaleTimeString()}
                           </span>
                         </div>
@@ -190,7 +190,7 @@ export default function HRFlags() {
         </div>
 
         {/* Staff Roster */}
-        <Card className="border-l-4 border-l-[#1B2A4A]">
+        <Card className="border-l-4 border-l-primary">
           <CardHeader>
             <CardTitle className="font-corp-display">Staff Roster</CardTitle>
           </CardHeader>
@@ -199,30 +199,30 @@ export default function HRFlags() {
               {staffRoster.map((staff) => (
                 <div
                   key={staff.id}
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-secondary transition-colors"
                   style={{ borderLeftColor: staff.branchColor, borderLeftWidth: '4px' }}
                 >
                   <div className="flex items-center gap-3 flex-1">
                     {getStatusDot(staff.status)}
                     <div>
-                      <p className="font-corp-body font-semibold text-gray-900">
+                      <p className="font-corp-body font-semibold text-foreground">
                         {staff.name}
                       </p>
-                      <p className="text-xs text-gray-500">{staff.branch}</p>
+                      <p className="text-xs text-muted-foreground">{staff.branch}</p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <p className="text-xs text-gray-600 font-corp-body">
+                      <p className="text-xs text-muted-foreground font-corp-body">
                         {getStatusLabel(staff.status)}
                       </p>
                       {staff.latenessCount > 0 || staff.absenceCount > 0 ? (
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                           {staff.latenessCount}L • {staff.absenceCount}A
                         </p>
                       ) : (
-                        <p className="text-xs text-green-600 font-semibold">Good standing</p>
+                        <p className="text-xs text-success font-semibold">Good standing</p>
                       )}
                     </div>
                   </div>
@@ -233,10 +233,10 @@ export default function HRFlags() {
         </Card>
 
         {/* Resolved Flags */}
-        <Card className="border-l-4 border-l-green-500 bg-green-50">
+        <Card className="border-l-4 border-l-success bg-success-bg">
           <CardHeader>
             <CardTitle className="font-corp-display flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-600" />
+              <CheckCircle className="w-5 h-5 text-success" />
               Resolved
             </CardTitle>
           </CardHeader>
@@ -245,7 +245,7 @@ export default function HRFlags() {
               {hrFlags
                 .filter((f) => f.resolved)
                 .map((flag) => (
-                  <div key={flag.id} className="text-sm font-corp-body text-gray-700">
+                  <div key={flag.id} className="text-sm font-corp-body text-foreground">
                     <p>
                       <strong>{flag.employeeName}</strong> - {flag.description}
                     </p>

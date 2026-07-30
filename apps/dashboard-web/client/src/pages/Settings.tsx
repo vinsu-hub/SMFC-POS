@@ -39,8 +39,6 @@ export default function Settings() {
     spoilage: true,
     attendance: true,
     sales: false,
-    email: true,
-    sms: false,
   });
 
   // Users
@@ -130,13 +128,13 @@ export default function Settings() {
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'employee':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-accent-soft text-accent-foreground';
       case 'manager':
-        return 'bg-green-100 text-green-800';
+        return 'bg-success-bg text-success';
       case 'executive':
-        return 'bg-purple-100 text-purple-800';
+        return 'bg-primary text-primary-foreground';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-secondary text-foreground';
     }
   };
 
@@ -144,7 +142,7 @@ export default function Settings() {
     <DashboardLayout title="Settings">
       <div className="p-6 space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 bg-gray-100 mb-6">
+          <TabsList className="grid w-full grid-cols-4 mb-6">
             <TabsTrigger value="general" className="font-corp-body">
               General
             </TabsTrigger>
@@ -172,7 +170,7 @@ export default function Settings() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-700 block mb-2">Branch Name</label>
+                  <label className="text-sm font-medium text-foreground block mb-2">Branch Name</label>
                   <Input
                     value={branchName}
                     onChange={(e) => setBranchName(e.target.value)}
@@ -182,7 +180,7 @@ export default function Settings() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-700 block mb-2">Phone</label>
+                    <label className="text-sm font-medium text-foreground block mb-2">Phone</label>
                     <Input
                       value={branchPhone}
                       onChange={(e) => setBranchPhone(e.target.value)}
@@ -190,7 +188,7 @@ export default function Settings() {
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-700 block mb-2">Email</label>
+                    <label className="text-sm font-medium text-foreground block mb-2">Email</label>
                     <Input
                       value={branchEmail}
                       onChange={(e) => setBranchEmail(e.target.value)}
@@ -200,7 +198,7 @@ export default function Settings() {
                 </div>
 
                 <div>
-                  <label className="text-sm font-medium text-gray-700 block mb-2">Operating Hours</label>
+                  <label className="text-sm font-medium text-foreground block mb-2">Operating Hours</label>
                   <Input
                     value={operatingHours}
                     onChange={(e) => setOperatingHours(e.target.value)}
@@ -210,7 +208,7 @@ export default function Settings() {
 
                 <Button
                   onClick={handleSaveGeneral}
-                  className="bg-[#1B2A4A] hover:bg-[#13203A] font-corp-display gap-2 w-full"
+                  className="font-corp-display gap-2 w-full"
                 >
                   <Save className="w-4 h-4" />
                   Save Changes
@@ -218,21 +216,21 @@ export default function Settings() {
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-blue-500">
+            <Card className="border-l-4 border-l-primary">
               <CardHeader>
                 <CardTitle className="font-corp-display">Account Settings</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-sm font-corp-body text-gray-600 mb-2">Current User</p>
-                  <p className="font-corp-display font-semibold text-gray-900">{user?.email}</p>
-                  <p className="text-xs text-gray-500 capitalize">Role: {user?.role}</p>
+                  <p className="text-sm font-corp-body text-muted-foreground mb-2">Current User</p>
+                  <p className="font-corp-display font-semibold text-foreground">{user?.email}</p>
+                  <p className="text-xs text-muted-foreground capitalize">Role: {user?.role}</p>
                 </div>
 
                 <Button
                   onClick={logout}
                   variant="outline"
-                  className="w-full font-corp-body text-red-600 border-red-200 hover:bg-red-50"
+                  className="w-full font-corp-body text-destructive border-error-bg hover:bg-error-bg"
                 >
                   Sign Out
                 </Button>
@@ -242,7 +240,7 @@ export default function Settings() {
 
           {/* Notifications */}
           <TabsContent value="notifications" className="space-y-6">
-            <Card className="border-l-4 border-l-yellow-500">
+            <Card className="border-l-4 border-l-warning">
               <CardHeader>
                 <CardTitle className="font-corp-display">Alert Preferences</CardTitle>
                 <CardDescription>Choose which alerts you want to receive</CardDescription>
@@ -251,8 +249,8 @@ export default function Settings() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 border rounded-lg">
                     <div>
-                      <p className="font-corp-body font-semibold text-gray-900">Low Stock Alerts</p>
-                      <p className="text-xs text-gray-500">Notified when inventory falls below threshold</p>
+                      <p className="font-corp-body font-semibold text-foreground">Low Stock Alerts</p>
+                      <p className="text-xs text-muted-foreground">Notified when inventory falls below threshold</p>
                     </div>
                     <Switch
                       checked={notifications.lowStock}
@@ -262,8 +260,8 @@ export default function Settings() {
 
                   <div className="flex items-center justify-between p-3 border rounded-lg">
                     <div>
-                      <p className="font-corp-body font-semibold text-gray-900">Spoilage Alerts</p>
-                      <p className="text-xs text-gray-500">Notified when items expire or spoil</p>
+                      <p className="font-corp-body font-semibold text-foreground">Spoilage Alerts</p>
+                      <p className="text-xs text-muted-foreground">Notified when items expire or spoil</p>
                     </div>
                     <Switch
                       checked={notifications.spoilage}
@@ -273,8 +271,8 @@ export default function Settings() {
 
                   <div className="flex items-center justify-between p-3 border rounded-lg">
                     <div>
-                      <p className="font-corp-body font-semibold text-gray-900">Attendance Alerts</p>
-                      <p className="text-xs text-gray-500">Notified of late arrivals and absences</p>
+                      <p className="font-corp-body font-semibold text-foreground">Attendance Alerts</p>
+                      <p className="text-xs text-muted-foreground">Notified of late arrivals and absences</p>
                     </div>
                     <Switch
                       checked={notifications.attendance}
@@ -284,37 +282,14 @@ export default function Settings() {
 
                   <div className="flex items-center justify-between p-3 border rounded-lg">
                     <div>
-                      <p className="font-corp-body font-semibold text-gray-900">Sales Milestones</p>
-                      <p className="text-xs text-gray-500">Notified when daily sales targets hit</p>
+                      <p className="font-corp-body font-semibold text-foreground">Sales Milestones</p>
+                      <p className="text-xs text-muted-foreground">Notified when daily sales targets hit</p>
                     </div>
                     <Switch
                       checked={notifications.sales}
                       onCheckedChange={() => handleNotificationChange('sales')}
                     />
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-green-500">
-              <CardHeader>
-                <CardTitle className="font-corp-display">Delivery Method</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <p className="font-corp-body font-semibold text-gray-900">Email Notifications</p>
-                  <Switch
-                    checked={notifications.email}
-                    onCheckedChange={() => handleNotificationChange('email')}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <p className="font-corp-body font-semibold text-gray-900">SMS Notifications</p>
-                  <Switch
-                    checked={notifications.sms}
-                    onCheckedChange={() => handleNotificationChange('sms')}
-                  />
                 </div>
               </CardContent>
             </Card>
@@ -330,7 +305,7 @@ export default function Settings() {
               <CardContent className="space-y-4">
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Button className="bg-[#1B2A4A] hover:bg-[#13203A] font-corp-display gap-2">
+                    <Button className="font-corp-display gap-2">
                       <Plus className="w-4 h-4" />
                       Add User
                     </Button>
@@ -343,7 +318,7 @@ export default function Settings() {
 
                     <div className="space-y-4">
                       <div>
-                        <label className="text-sm font-medium text-gray-700 block mb-1">Name</label>
+                        <label className="text-sm font-medium text-foreground block mb-1">Name</label>
                         <Input
                           placeholder="John Doe"
                           value={newUser.name}
@@ -353,7 +328,7 @@ export default function Settings() {
                       </div>
 
                       <div>
-                        <label className="text-sm font-medium text-gray-700 block mb-1">Email</label>
+                        <label className="text-sm font-medium text-foreground block mb-1">Email</label>
                         <Input
                           placeholder="john@example.com"
                           value={newUser.email}
@@ -363,7 +338,7 @@ export default function Settings() {
                       </div>
 
                       <div>
-                        <label className="text-sm font-medium text-gray-700 block mb-1">Role</label>
+                        <label className="text-sm font-medium text-foreground block mb-1">Role</label>
                         <Select value={newUser.role} onValueChange={(value) => setNewUser({ ...newUser, role: value })}>
                           <SelectTrigger className="font-corp-body">
                             <SelectValue />
@@ -378,7 +353,7 @@ export default function Settings() {
 
                       <Button
                         onClick={handleAddUser}
-                        className="w-full bg-[#1B2A4A] hover:bg-[#13203A] font-corp-display"
+                        className="w-full font-corp-display"
                       >
                         Create User
                       </Button>
@@ -401,8 +376,8 @@ export default function Settings() {
                       <TableRow key={u.id}>
                         <TableCell>
                           <div>
-                            <p className="font-corp-body font-semibold text-gray-900">{u.name}</p>
-                            <p className="text-xs text-gray-500">{u.email}</p>
+                            <p className="font-corp-body font-semibold text-foreground">{u.name}</p>
+                            <p className="text-xs text-muted-foreground">{u.email}</p>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -415,7 +390,7 @@ export default function Settings() {
                             {u.status.charAt(0).toUpperCase() + u.status.slice(1)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-sm text-gray-600">
+                        <TableCell className="text-sm text-muted-foreground">
                           {formatLastLogin(u.lastLogin)}
                         </TableCell>
                         <TableCell className="text-right space-x-2">
@@ -431,7 +406,7 @@ export default function Settings() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteUser(u.id)}
-                            className="text-red-600 hover:text-red-700"
+                            className="text-destructive hover:text-destructive/80"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -446,33 +421,33 @@ export default function Settings() {
 
           {/* System Settings */}
           <TabsContent value="system" className="space-y-6">
-            <Card className="border-l-4 border-l-red-500">
+            <Card className="border-l-4 border-l-destructive">
               <CardHeader>
                 <CardTitle className="font-corp-display">System Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs text-gray-500 font-corp-body mb-1">Version</p>
-                    <p className="font-corp-display font-semibold text-gray-900">v1.0.0</p>
+                    <p className="text-xs text-muted-foreground font-corp-body mb-1">Version</p>
+                    <p className="font-corp-display font-semibold text-foreground">v1.0.0</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 font-corp-body mb-1">Last Updated</p>
-                    <p className="font-corp-display font-semibold text-gray-900">2026-07-29</p>
+                    <p className="text-xs text-muted-foreground font-corp-body mb-1">Last Updated</p>
+                    <p className="font-corp-display font-semibold text-foreground">2026-07-29</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 font-corp-body mb-1">Database Status</p>
-                    <Badge className="bg-green-100 text-green-800">Connected</Badge>
+                    <p className="text-xs text-muted-foreground font-corp-body mb-1">Database Status</p>
+                    <Badge className="bg-success-bg text-success">Connected</Badge>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 font-corp-body mb-1">API Status</p>
-                    <Badge className="bg-green-100 text-green-800">Operational</Badge>
+                    <p className="text-xs text-muted-foreground font-corp-body mb-1">API Status</p>
+                    <Badge className="bg-success-bg text-success">Operational</Badge>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-l-4 border-l-orange-500">
+            <Card className="border-l-4 border-l-warning">
               <CardHeader>
                 <CardTitle className="font-corp-display">Maintenance</CardTitle>
               </CardHeader>
@@ -483,7 +458,7 @@ export default function Settings() {
                 <Button variant="outline" className="w-full font-corp-body justify-start">
                   Export Data
                 </Button>
-                <Button variant="outline" className="w-full font-corp-body justify-start text-red-600 border-red-200 hover:bg-red-50">
+                <Button variant="outline" className="w-full font-corp-body justify-start text-destructive border-error-bg hover:bg-error-bg">
                   Reset to Defaults
                 </Button>
               </CardContent>

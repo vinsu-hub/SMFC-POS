@@ -67,18 +67,18 @@ export default function InventoryCount() {
   const getStatusIcon = (status: ItemStatus) => {
     switch (status) {
       case 'counted':
-        return <CheckCircle className="w-4 h-4 text-green-600" />;
+        return <CheckCircle className="w-4 h-4 text-success" />;
       case 'variance':
-        return <AlertCircle className="w-4 h-4 text-red-600" />;
+        return <AlertCircle className="w-4 h-4 text-destructive" />;
       default:
-        return <Package className="w-4 h-4 text-gray-400" />;
+        return <Package className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
   const getVarianceColor = (variancePercent: number | null) => {
-    if (variancePercent === null) return 'text-gray-400';
-    if (Math.abs(variancePercent) <= 5) return 'text-green-600';
-    return 'text-red-600';
+    if (variancePercent === null) return 'text-muted-foreground';
+    if (Math.abs(variancePercent) <= 5) return 'text-success';
+    return 'text-destructive';
   };
 
   const rows = ingredients.map((ingredient) => {
@@ -107,15 +107,15 @@ export default function InventoryCount() {
       <div className="p-6 space-y-6">
         {/* Progress Summary */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="border-l-4 border-l-green-500">
+          <Card className="border-l-4 border-l-success">
             <CardContent className="p-4">
-              <p className="text-sm text-gray-600 font-corp-body mb-1">Items Counted</p>
-              <p className="text-3xl font-corp-display font-bold text-gray-900">
+              <p className="text-sm text-muted-foreground font-corp-body mb-1">Items Counted</p>
+              <p className="text-3xl font-corp-display font-bold text-foreground">
                 {countedItems}/{ingredients.length}
               </p>
-              <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+              <div className="w-full bg-secondary rounded-full h-2 mt-3">
                 <div
-                  className="bg-green-500 h-2 rounded-full transition-all"
+                  className="bg-success h-2 rounded-full transition-all"
                   style={{
                     width: `${ingredients.length ? (countedItems / ingredients.length) * 100 : 0}%`,
                   }}
@@ -124,23 +124,23 @@ export default function InventoryCount() {
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-yellow-500">
+          <Card className="border-l-4 border-l-warning">
             <CardContent className="p-4">
-              <p className="text-sm text-gray-600 font-corp-body mb-1">Variance Detected</p>
-              <p className="text-3xl font-corp-display font-bold text-yellow-600">
+              <p className="text-sm text-muted-foreground font-corp-body mb-1">Variance Detected</p>
+              <p className="text-3xl font-corp-display font-bold text-warning">
                 {varianceItems}
               </p>
-              <p className="text-xs text-gray-500 mt-2">Items with &gt;5% difference</p>
+              <p className="text-xs text-muted-foreground mt-2">Items with &gt;5% difference</p>
             </CardContent>
           </Card>
 
-          <Card className="border-l-4 border-l-blue-500">
+          <Card className="border-l-4 border-l-primary">
             <CardContent className="p-4">
-              <p className="text-sm text-gray-600 font-corp-body mb-1">Expected Total Value</p>
-              <p className="text-3xl font-corp-display font-bold text-gray-900">
+              <p className="text-sm text-muted-foreground font-corp-body mb-1">Expected Total Value</p>
+              <p className="text-3xl font-corp-display font-bold text-foreground">
                 {formatCurrency(expectedTotalValue)}
               </p>
-              <p className="text-xs text-gray-500 mt-2">Based on each ingredient's unit cost</p>
+              <p className="text-xs text-muted-foreground mt-2">Based on each ingredient's unit cost</p>
             </CardContent>
           </Card>
         </div>
@@ -156,12 +156,12 @@ export default function InventoryCount() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="flex items-center justify-center py-8 text-gray-500">
+              <div className="flex items-center justify-center py-8 text-muted-foreground">
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Loading inventory...
               </div>
             ) : ingredients.length === 0 ? (
-              <p className="text-center text-gray-500 py-8 font-corp-body">
+              <p className="text-center text-muted-foreground py-8 font-corp-body">
                 No ingredients set up for this branch yet.
               </p>
             ) : (
@@ -198,7 +198,7 @@ export default function InventoryCount() {
                             {variance.toFixed(1)} ({variancePercent?.toFixed(1)}%)
                           </span>
                         ) : (
-                          <span className="text-gray-400">—</span>
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
                       <TableCell className="text-center">{getStatusIcon(status)}</TableCell>
@@ -212,9 +212,9 @@ export default function InventoryCount() {
 
         {/* Variance Items */}
         {varianceItems > 0 && (
-          <Card className="border-l-4 border-l-red-500 bg-red-50">
+          <Card className="border-l-4 border-l-destructive bg-error-bg">
             <CardHeader>
-              <CardTitle className="font-corp-display text-red-900">Items with Variance</CardTitle>
+              <CardTitle className="font-corp-display text-destructive">Items with Variance</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -223,11 +223,11 @@ export default function InventoryCount() {
                   .map(({ ingredient, counted, variancePercent }) => (
                     <div
                       key={ingredient.id}
-                      className="flex justify-between items-center p-3 bg-white rounded border border-red-200"
+                      className="flex justify-between items-center p-3 bg-card rounded-md border border-border-regular"
                     >
                       <div>
-                        <p className="font-corp-body font-semibold text-gray-900">{ingredient.name}</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="font-corp-body font-semibold text-foreground">{ingredient.name}</p>
+                        <p className="text-xs text-muted-foreground">
                           Expected: {ingredient.current_stock} {ingredient.unit} • Counted: {counted}{' '}
                           {ingredient.unit}
                         </p>
@@ -246,7 +246,7 @@ export default function InventoryCount() {
         <Button
           onClick={handleSubmit}
           disabled={submitting || ingredients.length === 0 || countedItems < ingredients.length}
-          className="w-full bg-[#1B2A4A] hover:bg-[#13203A] font-corp-display py-6"
+          className="w-full font-corp-display py-6"
         >
           {submitting ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
           Save Inventory Count

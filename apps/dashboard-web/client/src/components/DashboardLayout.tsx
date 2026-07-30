@@ -13,6 +13,10 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children, title }: DashboardLayoutProps) {
   const { user, isAuthenticated, loading } = useAuth();
   const [, navigate] = useLocation();
+  const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(
+    () => typeof window !== 'undefined' && localStorage.getItem('sidebarCollapsed') === 'true'
+  );
 
   React.useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -20,12 +24,20 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
     }
   }, [isAuthenticated, loading, navigate]);
 
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('sidebarCollapsed', String(next));
+      return next;
+    });
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-gray-200 border-t-[#1B2A4A] rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-gray-600 font-corp-body">Loading...</p>
+          <div className="w-12 h-12 border-4 border-border-regular border-t-primary rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground font-corp-body">Loading...</p>
         </div>
       </div>
     );
@@ -36,10 +48,15 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header title={title} />
+    <div className="flex h-screen bg-background">
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={toggleSidebarCollapsed}
+        mobileOpen={mobileNavOpen}
+        onCloseMobile={() => setMobileNavOpen(false)}
+      />
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <Header title={title} onMenuClick={() => setMobileNavOpen(true)} />
         <main className="flex-1 overflow-auto">
           {children}
         </main>

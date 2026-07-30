@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import inventory, loss_records, products, recipes, transactions
+from app.routers import inventory, loss_records, malaya, products, recipes, summary, transactions
 
 app = FastAPI(title="Saint Michael Food Corp API")
 
@@ -17,6 +17,8 @@ app.include_router(recipes.router)
 app.include_router(inventory.router)
 app.include_router(transactions.router)
 app.include_router(loss_records.router)
+app.include_router(summary.router)
+app.include_router(malaya.router)
 
 
 @app.get("/health")
