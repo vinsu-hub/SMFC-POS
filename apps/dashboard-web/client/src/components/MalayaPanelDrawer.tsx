@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,15 @@ export function MalayaPanelDrawer() {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const scrollAnchorRef = useRef<HTMLDivElement>(null);
+  const prevCountRef = useRef(0);
+
+  useEffect(() => {
+    if (messages.length > prevCountRef.current) {
+      scrollAnchorRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevCountRef.current = messages.length;
+  }, [messages]);
 
   useEffect(() => {
     if (!storageKey) return;
@@ -139,6 +148,7 @@ export function MalayaPanelDrawer() {
               </div>
             )}
           </div>
+            <div ref={scrollAnchorRef} />
         </ScrollArea>
 
         {/* Input Area */}

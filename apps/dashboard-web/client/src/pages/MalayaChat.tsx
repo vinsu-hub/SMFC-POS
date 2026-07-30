@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
@@ -113,6 +113,15 @@ export default function MalayaChat() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const scrollAnchorRef = useRef<HTMLDivElement>(null);
+  const prevCountRef = useRef(0);
+
+  useEffect(() => {
+    if (messages.length > prevCountRef.current) {
+      scrollAnchorRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    prevCountRef.current = messages.length;
+  }, [messages]);
 
   // Load the saved log once we know who's logged in.
   useEffect(() => {
@@ -208,6 +217,7 @@ export default function MalayaChat() {
                 </div>
               )}
             </div>
+            <div ref={scrollAnchorRef} />
           </ScrollArea>
         </Card>
 
