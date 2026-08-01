@@ -63,13 +63,13 @@ export default function Login() {
       ],
     },
     {
-      branch: 'dbar',
-      branchName: "D' Bar",
-      color: '#B5651D',
+      branch: 'dden',
+      branchName: "D'Den",
+      color: '#8B4513',
       accounts: [
-        { name: 'Employee - Diego', email: 'diego@dbar.com', role: 'employee' },
-        { name: 'Employee - Carmen', email: 'carmen@dbar.com', role: 'employee' },
-        { name: 'Manager - Victor', email: 'victor@dbar.com', role: 'manager' },
+        { name: 'Employee - Diego', email: 'diego@dden.com', role: 'employee' },
+        { name: 'Employee - Carmen', email: 'carmen@dden.com', role: 'employee' },
+        { name: 'Manager - Victor', email: 'victor@dden.com', role: 'manager' },
       ],
     },
   ];

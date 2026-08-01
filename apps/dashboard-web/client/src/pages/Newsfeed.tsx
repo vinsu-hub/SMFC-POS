@@ -48,8 +48,8 @@ export default function Newsfeed() {
   const allItems: NewsItem[] = [
     {
       id: '1',
-      branch: 'dbar',
-      branchName: "D' Bar",
+      branch: 'dden',
+      branchName: "D'Den",
       branchColor: '#B5651D',
       type: 'expiry_urgent',
       title: 'Tanduay Rum - Expires Tomorrow',
@@ -82,8 +82,8 @@ export default function Newsfeed() {
     },
     {
       id: '4',
-      branch: 'dbar',
-      branchName: "D' Bar",
+      branch: 'dden',
+      branchName: "D'Den",
       branchColor: '#B5651D',
       type: 'general',
       title: 'Inventory Count Complete',
@@ -140,8 +140,8 @@ export default function Newsfeed() {
     },
     {
       id: '9',
-      branch: 'dbar',
-      branchName: "D' Bar",
+      branch: 'dden',
+      branchName: "D'Den",
       branchColor: '#B5651D',
       type: 'low_stock',
       title: 'Tonic Water Low Stock',
@@ -200,8 +200,8 @@ export default function Newsfeed() {
       yesterdaysSales: 14720.00,
       weeklyTrend: '+3.3%',
     },
-    dbar: {
-      name: "D' Bar",
+    dden: {
+      name: "D'Den",
       color: '#B5651D',
       accentColor: '#241726',
       revenue: 55120.75,
@@ -290,7 +290,7 @@ export default function Newsfeed() {
 
   // Determine which branches to show
   const visibleBranches = user?.role === 'executive' 
-    ? ['danielito', 'malaya', 'dbar']
+    ? ['danielito', 'malaya', 'dden']
     : user?.branch 
     ? [user.branch]
     : [];
@@ -325,8 +325,8 @@ export default function Newsfeed() {
                 <TabsTrigger value="malaya" className="font-corp-body">
                   Malaya's
                 </TabsTrigger>
-                <TabsTrigger value="dbar" className="font-corp-body">
-                  D' Bar
+                <TabsTrigger value="dden" className="font-corp-body">
+                  D'Den
                 </TabsTrigger>
               </>
             ) : user?.role === 'manager' ? (

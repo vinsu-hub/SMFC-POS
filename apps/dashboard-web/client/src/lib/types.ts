@@ -3,7 +3,7 @@
  * Defines data models for the multi-tenant POS platform
  */
 
-export type Branch = 'danielito' | 'malaya' | 'dbar';
+export type Branch = 'danielito' | 'malaya' | 'dden' | 'catering';
 export type Role = 'employee' | 'manager' | 'executive';
 
 export interface User {
@@ -160,7 +160,7 @@ export interface SyncStatus {
 
 export const BRANCH_CONFIG = {
   danielito: {
-    name: 'Danielito\'s Home Kitchen',
+    name: "Danielito's Home Kitchen",
     color: '#1F2E28',
     accentColor: '#C9A24B',
     displayFont: 'font-danielito-display',
@@ -168,20 +168,28 @@ export const BRANCH_CONFIG = {
     theme: 'light',
   },
   malaya: {
-    name: 'Malaya\'s Cafe',
+    name: "Malaya's Cafe",
     color: '#6E8368',
     accentColor: '#D9A441',
     displayFont: 'font-malaya-display',
     bodyFont: 'font-malaya-body',
     theme: 'light',
   },
-  dbar: {
-    name: 'D\' Bar',
-    color: '#B5651D',
-    accentColor: '#241726',
-    displayFont: 'font-dbar-display',
-    bodyFont: 'font-dbar-mono',
+  dden: {
+    name: "D'Den",
+    color: '#8B4513', // Saddle Brown for den atmosphere
+    accentColor: '#D4A574', // Warm sand accent
+    displayFont: 'font-dden-display',
+    bodyFont: 'font-dden-body',
     theme: 'dark',
+  },
+  catering: {
+    name: 'Saint Michael Food Corp Catering',
+    color: '#2A5C45', // Deep sage green
+    accentColor: '#C76A4F', // Terracotta
+    displayFont: 'font-catering-display',
+    bodyFont: 'font-catering-body',
+    theme: 'light',
   },
 };
 

@@ -19,6 +19,10 @@ import Newsfeed from "./pages/Newsfeed";
 import InventoryCount from "./pages/InventoryCount";
 import LossLog from "./pages/LossLog";
 import Settings from "./pages/Settings";
+import InventoryMovements from "./pages/InventoryMovements";
+import UtilityLog from "./pages/UtilityLog";
+import HRAttendance from "./pages/HRAttendance";
+import HRPayroll from "./pages/HRPayroll";
 import NotFound from "./pages/NotFound";
 
 function Router() {
@@ -35,6 +39,10 @@ function Router() {
       <Route path={"/newsfeed"} component={Newsfeed} />
       <Route path={"/inventory-count"} component={InventoryCount} />
       <Route path={"/loss-log"} component={LossLog} />
+      <Route path={"/inventory-movements"} component={InventoryMovements} />
+      <Route path={"/utility-log"} component={UtilityLog} />
+      <Route path={"/hr/attendance"} component={HRAttendance} />
+      <Route path={"/hr/payroll"} component={HRPayroll} />
       <Route path={"/settings"} component={Settings} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}

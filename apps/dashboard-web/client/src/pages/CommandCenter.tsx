@@ -1,18 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, XAxis, YAxis, BarChart, Bar } from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { BRANCH_CONFIG, type Branch } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { ApiOrganizationSummary, fetchMyOrganizationSummary } from '@/lib/api';
+import { ApiUtilitySummary, fetchOrgUtilitySummary, fetchTransfers } from '@/lib/api';
 import { supabase } from '@/lib/supabaseClient';
-import { AlertCircle, Banknote, Clock, Loader2, Package, TrendingUp, Users } from 'lucide-react';
+import { AlertCircle, Banknote, Clock, Loader2, Package, TrendingUp, Users, Zap, Droplets, Send, RefreshCw } from 'lucide-react';
 
 interface MetricCardProps {
   title: string;
@@ -74,7 +76,7 @@ const BRANCH_OPERATIONAL_META: Record<
     yesterdaysSales: 14720.0,
     weeklyTrend: '+3.3%',
   },
-  dbar: {
+  dden: {
     staffCount: 7,
     avgStaffUtilization: 95,
     expiringItems: 4,
@@ -85,24 +87,38 @@ const BRANCH_OPERATIONAL_META: Record<
   },
 };
 
-function matchBranchKey(branchName: string): Branch {
+function matchBranchKey(branchName: string): Branch | null {
+  // Returns null (not a fallback key) for a branch with no BRANCH_CONFIG entry
+  // (e.g. a legacy/renamed branch still holding transaction history) --
+  // silently coercing it to 'danielito' here previously caused two branches
+  // to collide under the same React list key.
   const entry = (Object.entries(BRANCH_CONFIG) as [Branch, (typeof BRANCH_CONFIG)[Branch]][]).find(
     ([, config]) => config.name === branchName
   );
-  return entry ? entry[0] : 'danielito';
+  return entry ? entry[0] : null;
 }
 
 const chartConfig: ChartConfig = {
   danielito: { label: "Danielito's", color: BRANCH_CONFIG.danielito.color },
   malaya: { label: "Malaya's", color: BRANCH_CONFIG.malaya.color },
-  dbar: { label: "D' Bar", color: BRANCH_CONFIG.dbar.color },
+  dden: { label: "D'Den", color: BRANCH_CONFIG.dden.color },
 };
 
 export default function CommandCenter() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [summary, setSummary] = useState<ApiOrganizationSummary | null>(null);
+  const [utilitySummary, setUtilitySummary] = useState<ApiUtilitySummary[]>([]);
+  const [transfers, setTransfers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [utilityLoading, setUtilityLoading] = useState(false);
+  const [transfersLoading, setTransfersLoading] = useState(false);
+  const [utilityPeriodStart, setUtilityPeriodStart] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d.toISOString().split('T')[0];
+  });
+  const [utilityPeriodEnd, setUtilityPeriodEnd] = useState(() => new Date().toISOString().split('T')[0]);
 
   const isExecutive = user?.role === 'executive';
 
@@ -116,7 +132,40 @@ export default function CommandCenter() {
         .finally(() => setLoading(false));
     };
 
+    const loadUtilitySummary = async () => {
+      setUtilityLoading(true);
+      try {
+        const data = await fetchOrgUtilitySummary(utilityPeriodStart, utilityPeriodEnd);
+        setUtilitySummary(data);
+      } catch (error) {
+        console.error('Failed to load utility summary:', error);
+      } finally {
+        setUtilityLoading(false);
+      }
+    };
+
+    const loadTransfers = async () => {
+      setTransfersLoading(true);
+      try {
+        // Get transfers for all branches (executive can see all)
+        const branchIds = (summary?.branches.map(b => {
+          const key = matchBranchKey(b.branch_name);
+          return key ? (BRANCH_CONFIG[key] as { id?: string })?.id : undefined; // This needs branch ids from BRANCH_CONFIG
+        }).filter(Boolean) || []) as string[];
+        
+        for (const branchId of branchIds) {
+          const data = await fetchTransfers(branchId);
+          setTransfers(prev => [...prev, ...data]);
+        }
+      } catch (error) {
+        console.error('Failed to load transfers:', error);
+      } finally {
+        setTransfersLoading(false);
+      }
+    };
+
     loadSummary();
+    loadUtilitySummary();
 
     // Live updates: a POS sale or a logged loss changes these numbers the
     // moment it happens, no polling or manual refresh needed.
@@ -124,12 +173,14 @@ export default function CommandCenter() {
       .channel('command-center-summary')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transactions' }, loadSummary)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'loss_records' }, loadSummary)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'utility_logs' }, loadUtilitySummary)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transfers' }, loadTransfers)
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isExecutive]);
+  }, [isExecutive, summary, utilityPeriodStart, utilityPeriodEnd]);
 
   if (!user || user.role !== 'executive') {
     return (
@@ -152,11 +203,12 @@ export default function CommandCenter() {
     );
   }
 
-  const branches = summary.branches.map((b) => {
+  const branches = summary.branches.flatMap((b) => {
     const key = matchBranchKey(b.branch_name);
+    if (!key) return [];
     const config = BRANCH_CONFIG[key];
     const meta = BRANCH_OPERATIONAL_META[key];
-    return {
+    return [{
       key,
       name: b.branch_name,
       color: config.color,
@@ -168,13 +220,24 @@ export default function CommandCenter() {
       hourlyRevenue: b.hourly_revenue,
       todaysSales: b.revenue,
       ...meta,
-    };
+    }];
   });
 
   const totalRevenue = summary.total_revenue;
   const totalCogs = summary.total_cogs;
   const totalLosses = summary.total_losses;
   const avgMarginPercent = summary.total_margin_percent.toFixed(1);
+
+  // Utility totals across all branches
+  const totalElectricityCost = utilitySummary.reduce((sum, u) => sum + (u.electricity?.cost || 0), 0);
+  const totalWaterCost = utilitySummary.reduce((sum, u) => sum + (u.water?.cost || 0), 0);
+  const totalUtilityCost = totalElectricityCost + totalWaterCost;
+  const totalElectricityConsumption = utilitySummary.reduce((sum, u) => sum + (u.electricity?.consumption || 0), 0);
+  const totalWaterConsumption = utilitySummary.reduce((sum, u) => sum + (u.water?.consumption || 0), 0);
+
+  // Transfer stats
+  const pendingTransfers = transfers.filter(t => t.status === 'pending').length;
+  const confirmedTransfers = transfers.filter(t => t.status === 'confirmed').length;
 
   // Only chart hours with any activity across branches so far today — an
   // all-zero 24-hour axis before the branches open is just noise.
@@ -192,7 +255,7 @@ export default function CommandCenter() {
     <DashboardLayout title="Command Center">
       <div className="p-6 space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             <TabsTrigger value="overview" className="font-corp-body">
               Overview
             </TabsTrigger>
@@ -202,15 +265,18 @@ export default function CommandCenter() {
             <TabsTrigger value="malaya" className="font-corp-body">
               Malaya's
             </TabsTrigger>
-            <TabsTrigger value="dbar" className="font-corp-body">
-              D' Bar
+            <TabsTrigger value="dden" className="font-corp-body">
+              D'Den
+            </TabsTrigger>
+            <TabsTrigger value="utility-monitor" className="font-corp-body">
+              Utility Monitor
             </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
             {/* Corporate Totals */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-8 gap-4">
               <MetricCard
                 title="Total Revenue"
                 value={formatCurrency(totalRevenue)}
@@ -234,6 +300,30 @@ export default function CommandCenter() {
                 value={`${avgMarginPercent}%`}
                 icon={TrendingUp}
                 color="#0E3F3A"
+              />
+              <MetricCard
+                title="Electricity Cost"
+                value={formatCurrency(totalElectricityCost)}
+                icon={Zap}
+                color="#C98A2C"
+              />
+              <MetricCard
+                title="Water Cost"
+                value={formatCurrency(totalWaterCost)}
+                icon={Droplets}
+                color="#14524B"
+              />
+              <MetricCard
+                title="Total Utilities"
+                value={formatCurrency(totalUtilityCost)}
+                icon={Zap}
+                color="#6F6A5C"
+              />
+              <MetricCard
+                title="Pending Transfers"
+                value={String(pendingTransfers)}
+                icon={Send}
+                color="#1E7A4C"
               />
             </div>
 
@@ -525,6 +615,171 @@ export default function CommandCenter() {
               </Card>
             </TabsContent>
           ))}
+
+          {/* Utility Monitor Tab */}
+          <TabsContent value="utility-monitor" className="space-y-6">
+            {/* Period Selector */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex flex-wrap items-end gap-4">
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-foreground font-corp-body">Period Start</label>
+                    <Input
+                      type="date"
+                      value={utilityPeriodStart}
+                      onChange={(e) => setUtilityPeriodStart(e.target.value)}
+                      className="font-corp-body w-48"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium text-foreground font-corp-body">Period End</label>
+                    <Input
+                      type="date"
+                      value={utilityPeriodEnd}
+                      onChange={(e) => setUtilityPeriodEnd(e.target.value)}
+                      className="font-corp-body w-48"
+                    />
+                  </div>
+                  {utilityLoading && (
+                    <div className="flex items-center text-muted-foreground text-sm font-corp-body">
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Refreshing...
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Corporate Utility Totals */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <MetricCard
+                title="Electricity Used"
+                value={`${totalElectricityConsumption.toFixed(1)} kWh`}
+                icon={Zap}
+                color="#C98A2C"
+              />
+              <MetricCard
+                title="Electricity Cost"
+                value={formatCurrency(totalElectricityCost)}
+                icon={Zap}
+                color="#C98A2C"
+              />
+              <MetricCard
+                title="Water Used"
+                value={`${totalWaterConsumption.toFixed(1)} m³`}
+                icon={Droplets}
+                color="#14524B"
+              />
+              <MetricCard
+                title="Water Cost"
+                value={formatCurrency(totalWaterCost)}
+                icon={Droplets}
+                color="#14524B"
+              />
+              <MetricCard
+                title="Total Utility Cost"
+                value={formatCurrency(totalUtilityCost)}
+                icon={Zap}
+                color="#6F6A5C"
+              />
+            </div>
+
+            {/* Per-Branch Cost Comparison */}
+            <Card className="border-l-4 border-l-primary">
+              <CardHeader>
+                <CardTitle className="font-corp-display">Utility Cost by Branch</CardTitle>
+                <CardDescription>
+                  {utilityPeriodStart} to {utilityPeriodEnd}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {utilitySummary.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8 font-corp-body">
+                    No utility readings recorded for this period
+                  </p>
+                ) : (
+                  <ChartContainer
+                    config={{ cost: { label: 'Total Utility Cost', color: '#14524B' } }}
+                    className="max-h-72 w-full"
+                  >
+                    <BarChart
+                      data={utilitySummary.map((u) => ({ branch: u.branch_name, cost: u.total_cost }))}
+                      margin={{ left: 8, right: 8 }}
+                    >
+                      <CartesianGrid vertical={false} />
+                      <XAxis dataKey="branch" tickLine={false} axisLine={false} />
+                      <YAxis
+                        tickLine={false}
+                        axisLine={false}
+                        width={72}
+                        tickFormatter={(value) => formatCurrency(Number(value))}
+                      />
+                      <ChartTooltip
+                        content={<ChartTooltipContent formatter={(value) => formatCurrency(Number(value))} />}
+                      />
+                      <Bar dataKey="cost" fill="#14524B" radius={4} />
+                    </BarChart>
+                  </ChartContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Per-Branch Breakdown Table */}
+            <Card className="border-l-4 border-l-primary">
+              <CardHeader>
+                <CardTitle className="font-corp-display">Branch Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Branch</TableHead>
+                      <TableHead className="text-right">Electricity (kWh)</TableHead>
+                      <TableHead className="text-right">Electricity Cost</TableHead>
+                      <TableHead className="text-right">Water (m³)</TableHead>
+                      <TableHead className="text-right">Water Cost</TableHead>
+                      <TableHead className="text-right">Total Cost</TableHead>
+                      <TableHead className="text-right">Readings</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {utilitySummary.map((u) => (
+                      <TableRow key={u.branch_id}>
+                        <TableCell className="font-corp-body font-medium">{u.branch_name}</TableCell>
+                        <TableCell className="text-right font-corp-mono">
+                          {u.electricity.consumption.toFixed(1)}
+                        </TableCell>
+                        <TableCell className="text-right font-corp-mono">
+                          {formatCurrency(u.electricity.cost)}
+                        </TableCell>
+                        <TableCell className="text-right font-corp-mono">{u.water.consumption.toFixed(1)}</TableCell>
+                        <TableCell className="text-right font-corp-mono">{formatCurrency(u.water.cost)}</TableCell>
+                        <TableCell className="text-right font-corp-mono font-bold">
+                          {formatCurrency(u.total_cost)}
+                        </TableCell>
+                        <TableCell className="text-right font-corp-mono text-muted-foreground">
+                          {u.electricity.readings_count + u.water.readings_count}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="bg-secondary font-semibold">
+                      <TableCell className="font-corp-body">Total</TableCell>
+                      <TableCell className="text-right font-corp-mono">
+                        {totalElectricityConsumption.toFixed(1)}
+                      </TableCell>
+                      <TableCell className="text-right font-corp-mono">{formatCurrency(totalElectricityCost)}</TableCell>
+                      <TableCell className="text-right font-corp-mono">{totalWaterConsumption.toFixed(1)}</TableCell>
+                      <TableCell className="text-right font-corp-mono">{formatCurrency(totalWaterCost)}</TableCell>
+                      <TableCell className="text-right font-corp-mono">{formatCurrency(totalUtilityCost)}</TableCell>
+                      <TableCell className="text-right font-corp-mono">
+                        {utilitySummary.reduce((sum, u) => sum + u.electricity.readings_count + u.water.readings_count, 0)}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
     </DashboardLayout>

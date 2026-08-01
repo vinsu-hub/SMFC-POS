@@ -63,6 +63,222 @@ export interface ApiLossRecord {
   created_at: string;
 }
 
+// --- Inventory Movements ---
+export type MovementType = 'trans_in' | 'trans_out' | 'delivery' | 'transfer_in' | 'transfer_out';
+
+export interface ApiInventoryMovement {
+  id: string;
+  branch_id: string;
+  ingredient_id: string;
+  type: MovementType;
+  quantity: number;
+  reason: string | null;
+  reference_id: string | null;
+  employee_id: string;
+  unit_cost_snapshot: number | null;
+  created_at: string;
+}
+
+export interface CreateInventoryMovementRequest {
+  branch_id: string;
+  ingredient_id: string;
+  type: MovementType;
+  quantity: number;
+  reason?: string | null;
+  reference_id?: string | null;
+  employee_id: string;
+}
+
+// --- Transfers ---
+export interface ApiTransfer {
+  id: string;
+  from_branch_id: string;
+  to_branch_id: string;
+  ingredient_id: string;
+  quantity: number;
+  status: 'pending' | 'confirmed' | 'rejected' | 'cancelled';
+  initiated_by: string;
+  confirmed_by: string | null;
+  initiated_at: string;
+  confirmed_at: string | null;
+  notes: string | null;
+}
+
+export interface CreateTransferRequest {
+  from_branch_id: string;
+  to_branch_id: string;
+  ingredient_id: string;
+  quantity: number;
+  initiated_by: string;
+  notes?: string | null;
+}
+
+// --- Utility ---
+export type UtilityType = 'electricity' | 'water';
+
+export interface ApiUtilityLog {
+  id: string;
+  branch_id: string;
+  utility_type: UtilityType;
+  business_date: string;
+  reading_start: number;
+  reading_end: number | null;
+  unit_cost: number;
+  recorded_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateUtilityLogRequest {
+  branch_id: string;
+  utility_type: UtilityType;
+  business_date: string;
+  reading_start: number;
+  reading_end?: number | null;
+  unit_cost: number;
+  recorded_by: string;
+}
+
+export interface ApiUtilitySummary {
+  branch_id: string;
+  branch_name: string;
+  period_start: string | null;
+  period_end: string | null;
+  electricity: {
+    consumption: number;
+    cost: number;
+    readings_count: number;
+  };
+  water: {
+    consumption: number;
+    cost: number;
+    readings_count: number;
+  };
+  total_cost: number;
+}
+
+// --- HR / Attendance / Payroll ---
+export interface ApiAttendanceLog {
+  id: string;
+  employee_id: string;
+  branch_id: string;
+  clock_in: string;
+  clock_out: string | null;
+  date: string;
+  hours_worked: number | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClockInRequest {
+  employee_id: string;
+  branch_id: string;
+}
+
+export interface ClockOutRequest {
+  employee_id: string;
+}
+
+export interface ApiEmployee {
+  id: string;
+  full_name: string;
+  email: string;
+  role: string;
+  branch_id: string;
+  pay_rate: number;
+  position: string | null;
+  payroll_schedule: string;
+}
+
+export interface UpdateEmployeeRequest {
+  pay_rate?: number;
+  position?: string | null;
+  payroll_schedule?: string | null;
+}
+
+export interface ApiPayrollRow {
+  employee_id: string;
+  employee_name: string;
+  position: string;
+  branch_id: string;
+  hours_worked: number;
+  pay_rate: number;
+  total_pay: number;
+  period_start: string;
+  period_end: string;
+}
+
+export interface ApiPayrollSummary {
+  branch_id: string;
+  period_start: string;
+  period_end: string;
+  rows: ApiPayrollRow[];
+  total_hours: number;
+  total_pay: number;
+  employee_count: number;
+}
+
+export interface ApiHrFlag {
+  id: string;
+  employee_id: string;
+  branch_id: string;
+  pattern_type: 'lateness' | 'absence' | 'overtime' | 'other';
+  description: string;
+  resolved: boolean;
+  created_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+}
+
+export interface HourlyRevenuePoint {
+  hour: number;
+  revenue: number;
+}
+
+export interface ApiBranchSummary {
+  branch_id: string;
+  branch_name: string;
+  revenue: number;
+  cogs: number;
+  losses: number;
+  margin: number;
+  margin_percent: number;
+  hourly_revenue: HourlyRevenuePoint[];
+}
+
+export interface ApiOrganizationSummary {
+  organization_id: string;
+  branches: ApiBranchSummary[];
+  total_revenue: number;
+  total_cogs: number;
+  total_losses: number;
+  total_margin: number;
+  total_margin_percent: number;
+  hourly_revenue: HourlyRevenuePoint[];
+}
+
+export interface ApiMalayaChartPoint {
+  label: string;
+  value: number;
+}
+
+export interface ApiMalayaChartSeries {
+  name: string;
+  data: ApiMalayaChartPoint[];
+}
+
+export interface ApiMalayaChartSpec {
+  type: 'bar' | 'line';
+  title: string;
+  series: ApiMalayaChartSeries[];
+}
+
+export interface ApiMalayaResponse {
+  answer: string;
+  chart: ApiMalayaChartSpec | null;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const {
     data: { session },
@@ -129,8 +345,6 @@ export function fetchBranchLosses(branchId: string): Promise<ApiLossRecord[]> {
   return request(`/branches/${branchId}/losses`);
 }
 
-/** Uploads to the private 'loss-photos' bucket and returns the storage path
- * (branch-scoped by RLS, see supabase/migrations/0003_loss_photos_storage.sql). */
 export async function uploadLossPhoto(branchId: string, file: File): Promise<string> {
   const extension = file.name.split('.').pop() ?? 'jpg';
   const path = `${branchId}/${crypto.randomUUID()}.${extension}`;
@@ -149,33 +363,6 @@ export async function getLossPhotoUrl(path: string): Promise<string | null> {
   return data.signedUrl;
 }
 
-export interface HourlyRevenuePoint {
-  hour: number;
-  revenue: number;
-}
-
-export interface ApiBranchSummary {
-  branch_id: string;
-  branch_name: string;
-  revenue: number;
-  cogs: number;
-  losses: number;
-  margin: number;
-  margin_percent: number;
-  hourly_revenue: HourlyRevenuePoint[];
-}
-
-export interface ApiOrganizationSummary {
-  organization_id: string;
-  branches: ApiBranchSummary[];
-  total_revenue: number;
-  total_cogs: number;
-  total_losses: number;
-  total_margin: number;
-  total_margin_percent: number;
-  hourly_revenue: HourlyRevenuePoint[];
-}
-
 export function fetchBranchSummary(branchId: string): Promise<ApiBranchSummary> {
   return request(`/branches/${branchId}/summary`);
 }
@@ -184,32 +371,8 @@ export function fetchOrganizationSummary(organizationId: string): Promise<ApiOrg
   return request(`/organizations/${organizationId}/summary`);
 }
 
-/** Resolves the caller's own organization — use this from the Executive
- * Overview instead of fetchOrganizationSummary, since the frontend has no
- * organization_id to pass (profiles only carries branch_id/role). */
 export function fetchMyOrganizationSummary(): Promise<ApiOrganizationSummary> {
   return request('/organizations/summary');
-}
-
-export interface ApiMalayaChartPoint {
-  label: string;
-  value: number;
-}
-
-export interface ApiMalayaChartSeries {
-  name: string;
-  data: ApiMalayaChartPoint[];
-}
-
-export interface ApiMalayaChartSpec {
-  type: 'bar' | 'line';
-  title: string;
-  series: ApiMalayaChartSeries[];
-}
-
-export interface ApiMalayaResponse {
-  answer: string;
-  chart: ApiMalayaChartSpec | null;
 }
 
 export function queryMalaya(question: string): Promise<ApiMalayaResponse> {
@@ -217,4 +380,207 @@ export function queryMalaya(question: string): Promise<ApiMalayaResponse> {
     method: 'POST',
     body: JSON.stringify({ question }),
   });
+}
+
+// --- Inventory Movements ---
+export function fetchInventoryMovements(
+  branchId: string,
+  ingredientId?: string,
+  type?: MovementType
+): Promise<ApiInventoryMovement[]> {
+  const params = new URLSearchParams({ branch_id: branchId });
+  if (ingredientId) params.append('ingredient_id', ingredientId);
+  if (type) params.append('type', type);
+  return request(`/inventory-movements?${params.toString()}`);
+}
+
+export function createInventoryMovement(body: CreateInventoryMovementRequest): Promise<ApiInventoryMovement> {
+  return request('/inventory-movements', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function fetchBranchInventoryMovements(branchId: string): Promise<ApiInventoryMovement[]> {
+  return request(`/branches/${branchId}/inventory-movements`);
+}
+
+// --- Transfers ---
+export function fetchTransfers(
+  branchId: string,
+  status?: string
+): Promise<ApiTransfer[]> {
+  const params = new URLSearchParams({ branch_id: branchId });
+  if (status) params.append('status', status);
+  return request(`/transfers?${params.toString()}`);
+}
+
+export function fetchTransfer(transferId: string): Promise<ApiTransfer> {
+  return request(`/transfers/${transferId}`);
+}
+
+export function createTransfer(body: CreateTransferRequest): Promise<ApiTransfer> {
+  return request('/transfers', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function confirmTransfer(transferId: string): Promise<ApiTransfer> {
+  return request(`/transfers/${transferId}/confirm`, { method: 'POST' });
+}
+
+export function rejectTransfer(transferId: string): Promise<ApiTransfer> {
+  return request(`/transfers/${transferId}/reject`, { method: 'POST' });
+}
+
+// --- Utility ---
+export function fetchUtilityLogs(
+  branchId: string,
+  utilityType?: UtilityType,
+  fromDate?: string,
+  toDate?: string
+): Promise<ApiUtilityLog[]> {
+  const params = new URLSearchParams({ branch_id: branchId });
+  if (utilityType) params.append('utility_type', utilityType);
+  if (fromDate) params.append('from_date', fromDate);
+  if (toDate) params.append('to_date', toDate);
+  return request(`/utility-logs?${params.toString()}`);
+}
+
+export function createUtilityLog(body: CreateUtilityLogRequest): Promise<ApiUtilityLog> {
+  return request('/utility-logs', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function fetchUtilitySummary(
+  branchId: string,
+  fromDate?: string,
+  toDate?: string
+): Promise<ApiUtilitySummary> {
+  const params = new URLSearchParams();
+  if (fromDate) params.append('from_date', fromDate);
+  if (toDate) params.append('to_date', toDate);
+  return request(`/branches/${branchId}/utility-summary?${params.toString()}`);
+}
+
+export function fetchOrgUtilitySummary(
+  fromDate?: string,
+  toDate?: string
+): Promise<ApiUtilitySummary[]> {
+  const params = new URLSearchParams();
+  if (fromDate) params.append('from_date', fromDate);
+  if (toDate) params.append('to_date', toDate);
+  return request(`/organizations/utility-summary?${params.toString()}`);
+}
+
+// --- HR / Attendance / Payroll ---
+export function clockIn(body: ClockInRequest): Promise<ApiAttendanceLog> {
+  return request('/attendance/clock-in', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function clockOut(body: ClockOutRequest): Promise<ApiAttendanceLog> {
+  return request('/attendance/clock-out', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function fetchMyAttendance(): Promise<ApiAttendanceLog | null> {
+  return request('/attendance/me');
+}
+
+export function fetchBranchAttendance(
+  branchId: string,
+  dateFrom?: string,
+  dateTo?: string
+): Promise<ApiAttendanceLog[]> {
+  const params = new URLSearchParams();
+  if (dateFrom) params.append('date_from', dateFrom);
+  if (dateTo) params.append('date_to', dateTo);
+  return request(`/branches/${branchId}/attendance?${params.toString()}`);
+}
+
+export function fetchPayrollSummary(
+  branchId: string,
+  dateFrom: string,
+  dateTo: string
+): Promise<ApiPayrollSummary> {
+  return request(`/branches/${branchId}/attendance/summary?date_from=${dateFrom}&date_to=${dateTo}`);
+}
+
+async function requestBlob(path: string): Promise<Blob> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('Not signed in');
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`API ${path} failed: ${response.status} ${body}`);
+  }
+  return response.blob();
+}
+
+export function fetchPayrollReceiptPdf(
+  branchId: string,
+  employeeId: string,
+  periodStart: string,
+  periodEnd: string
+): Promise<Blob> {
+  return requestBlob(
+    `/branches/${branchId}/payroll/${employeeId}/receipt.pdf?period_start=${periodStart}&period_end=${periodEnd}`
+  );
+}
+
+export function fetchPayrollReceiptsZip(
+  branchId: string,
+  periodStart: string,
+  periodEnd: string
+): Promise<Blob> {
+  return requestBlob(`/branches/${branchId}/payroll/receipts.zip?period_start=${periodStart}&period_end=${periodEnd}`);
+}
+
+export function fetchEmployees(branchId: string): Promise<ApiEmployee[]> {
+  return request(`/employees?branch_id=${branchId}`);
+}
+
+export function updateEmployee(employeeId: string, body: UpdateEmployeeRequest): Promise<ApiEmployee> {
+  return request(`/employees/${employeeId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export function fetchHrFlags(
+  branchId?: string,
+  resolved?: boolean
+): Promise<ApiHrFlag[]> {
+  const params = new URLSearchParams();
+  if (branchId) params.append('branch_id', branchId);
+  if (resolved !== undefined) params.append('resolved', String(resolved));
+  return request(`/hr-flags?${params.toString()}`);
+}
+
+export function createHrFlag(body: { employee_id: string; branch_id: string; pattern_type: string; description: string }): Promise<ApiHrFlag> {
+  return request('/hr-flags', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function resolveHrFlag(flagId: string): Promise<ApiHrFlag> {
+  return request(`/hr-flags/${flagId}/resolve`, { method: 'PATCH' });
 }

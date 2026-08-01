@@ -178,7 +178,7 @@ export default function TrendAnalysis() {
               <li>✓ Cocktails are the strongest performer — up 34% YoY</li>
               <li>✓ Seasonal desserts are gaining momentum — prepare for holiday rush</li>
               <li>✓ Traditional proteins (Crispy Pata, Ensaymada) are declining — consider rotating menu</li>
-              <li>✓ D' Bar is driving cocktail sales — leverage this strength across venues</li>
+              <li>✓ D'Den is driving cocktail sales — leverage this strength across venues</li>
             </ul>
           </CardContent>
         </Card>

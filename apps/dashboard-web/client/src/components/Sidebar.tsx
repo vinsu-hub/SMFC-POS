@@ -16,6 +16,13 @@ import {
   ChevronRight,
   Sparkles,
   X,
+  Zap,
+  Droplets,
+  Wallet,
+  ClipboardList,
+  Truck,
+  Send,
+  RefreshCw,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -46,6 +53,8 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
           { icon: ShoppingCart, label: 'POS Terminal', href: '/pos', show: true },
           { icon: Package, label: 'Count Stock', href: '/inventory-count', show: true },
           { icon: AlertCircle, label: 'Log Loss', href: '/loss-log', show: true },
+          { icon: Truck, label: 'Inventory Movements', href: '/inventory-movements', show: true },
+          { icon: Zap, label: 'Utility Log', href: '/utility-log', show: true },
           { icon: MessageSquare, label: 'Newsfeed', href: '/newsfeed', show: true },
         ]
       : []),
@@ -54,7 +63,10 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
           { icon: BarChart3, label: 'EOD Dashboard', href: '/dashboard', show: true },
           { icon: Package, label: 'Inventory Count', href: '/inventory-count', show: true },
           { icon: AlertCircle, label: 'Loss Log', href: '/loss-log', show: true },
-          { icon: Users, label: 'HR Flags', href: '/hr-flags', show: true },
+          { icon: Truck, label: 'Inventory Movements', href: '/inventory-movements', show: true },
+          { icon: Zap, label: 'Utility Log', href: '/utility-log', show: true },
+          { icon: Users, label: 'HR Management', href: '/hr/attendance', show: true },
+          { icon: Wallet, label: 'Payroll', href: '/hr/payroll', show: true },
           { icon: MessageSquare, label: 'Newsfeed', href: '/newsfeed', show: true },
         ]
       : []),
@@ -63,7 +75,8 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
           { icon: BarChart3, label: 'Command Center', href: '/command-center', show: true },
           { icon: TrendingUp, label: 'Trend Analysis', href: '/trends', show: true },
           { icon: Sparkles, label: 'Malaya AI', href: '/malaya', show: true },
-          { icon: Users, label: 'HR Flags', href: '/hr-flags', show: true },
+          { icon: Users, label: 'HR Management', href: '/hr/attendance', show: true },
+          { icon: Wallet, label: 'Payroll', href: '/hr/payroll', show: true },
           { icon: MessageSquare, label: 'Newsfeed', href: '/newsfeed', show: true },
         ]
       : []),
@@ -81,7 +94,7 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
           >
             {user.branch === 'danielito' && 'D'}
             {user.branch === 'malaya' && 'M'}
-            {user.branch === 'dbar' && 'B'}
+            {user.branch === 'dden' && 'D'}
             {!user.branch && 'HQ'}
           </div>
           {!isCollapsed && (

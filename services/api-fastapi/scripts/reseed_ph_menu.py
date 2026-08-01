@@ -23,6 +23,10 @@ DBAR = "618fe59d-4f36-44c4-a92b-0599fd03e07e"
 
 
 def wipe_branch_menu(branch_id):
+    supabase.table("loss_records").delete().eq("branch_id", branch_id).execute()
+    prods = supabase.table("products").select("id").eq("branch_id", branch_id).execute()
+    for p in prods.data:
+        supabase.table("recipe_items").delete().eq("product_id", p["id"]).execute()
     supabase.table("transactions").delete().eq("branch_id", branch_id).execute()
     supabase.table("products").delete().eq("branch_id", branch_id).execute()
     supabase.table("ingredients").delete().eq("branch_id", branch_id).execute()

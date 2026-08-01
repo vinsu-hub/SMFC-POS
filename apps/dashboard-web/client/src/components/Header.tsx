@@ -59,7 +59,7 @@ export function Header({ title, showLogo = true, onMenuClick }: HeaderProps) {
             >
               {user.branch === 'danielito' && 'D'}
               {user.branch === 'malaya' && 'M'}
-              {user.branch === 'dbar' && 'B'}
+              {user.branch === 'dden' && 'D'}
               {!user.branch && 'HQ'}
             </div>
           )}

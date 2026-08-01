@@ -212,8 +212,12 @@
     @apply border-l-4 border-l-[#6E8368];
   }
 
-  .brand-thread-dbar {
-    @apply border-l-4 border-l-[#B5651D];
+  .brand-thread-dden {
+    @apply border-l-4 border-l-[#8B4513];
+  }
+
+  .brand-thread-catering {
+    @apply border-l-4 border-l-[#2A5C45];
   }
 
   /* Sync status indicator dot */
@@ -250,7 +254,7 @@
 }
 
 /* Google Fonts imports for all brand typefaces */
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&family=Fraunces:wght@400;600;700&family=Public+Sans:wght@400;600;700&family=Fredoka:wght@400;500;600&family=Karla:wght@400;600;700&family=Oswald:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&family=Fraunces:wght@400;600;700&family=Public+Sans:wght@400;600;700&family=Fredoka:wght@400;500;600&family=Karla:wght@400;600;700&family=Oswald:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap');
 
 /* Typography system */
 @layer base {
@@ -288,14 +292,25 @@
     font-family: 'Karla', sans-serif;
   }
 
-  /* D' Bar typography */
-  .font-dbar-display {
+  /* D'Den typography */
+  .font-dden-display {
     font-family: 'Oswald', sans-serif;
     font-weight: 600;
   }
 
-  .font-dbar-mono {
+  .font-dden-body {
     font-family: 'JetBrains Mono', monospace;
     font-weight: 600;
+  }
+
+  /* SMFC Catering typography */
+  .font-catering-display {
+    font-family: 'Playfair Display', serif;
+    font-weight: 600;
+  }
+
+  .font-catering-body {
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
   }
 }
