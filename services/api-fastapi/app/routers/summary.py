@@ -29,13 +29,17 @@ def _compute_branch_summary(supabase, branch_id: str, branch_name: str) -> Branc
 
     transactions_result = (
         supabase.table("transactions")
-        .select("id, total_amount, opened_at")
+        .select("id, total_amount, opened_at, is_owner_request")
         .eq("branch_id", branch_id)
+        .neq("status", "voided")
         .gte("opened_at", start)
         .lt("opened_at", end)
         .execute()
     )
-    transactions = transactions_result.data
+    # Voided orders are excluded at the query level; owner's-request orders
+    # (comped, not paid sales) are excluded here so revenue only reflects
+    # actual customer transactions.
+    transactions = [t for t in transactions_result.data if not t.get("is_owner_request")]
 
     revenue = sum(float(t["total_amount"]) for t in transactions)
 

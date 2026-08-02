@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Settings as SettingsIcon, Bell, Users, Lock, Save, Trash2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import { BRANCH_CONFIG, LOCATIONS, type Branch } from '@/lib/types';
 
 interface User {
   id: string;
@@ -28,7 +29,8 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState('general');
 
   // General Settings
-  const [branchName, setBranchName] = useState(user?.branch === 'danielito' ? "Danielito's Home Kitchen" : user?.branch === 'malaya' ? "Malaya's Cafe" : "D'Den");
+  const defaultBranch: Branch = user?.branch ?? LOCATIONS[0].themeKey;
+  const [branchName, setBranchName] = useState(BRANCH_CONFIG[defaultBranch].name);
   const [branchPhone, setBranchPhone] = useState('+63 917 123 4567');
   const [branchEmail, setBranchEmail] = useState('branch@saintmichael.com');
   const [operatingHours, setOperatingHours] = useState('11:00 AM - 11:00 PM');
@@ -48,7 +50,7 @@ export default function Settings() {
       name: 'John Smith',
       email: 'john@example.com',
       role: 'employee',
-      branch: user?.branch || 'danielito',
+      branch: defaultBranch,
       status: 'active',
       lastLogin: new Date(Date.now() - 2 * 60 * 60 * 1000),
     },
@@ -57,7 +59,7 @@ export default function Settings() {
       name: 'Sarah Manager',
       email: 'sarah@example.com',
       role: 'manager',
-      branch: user?.branch || 'danielito',
+      branch: defaultBranch,
       status: 'active',
       lastLogin: new Date(Date.now() - 30 * 60 * 1000),
     },
@@ -66,7 +68,7 @@ export default function Settings() {
       name: 'Alex Employee',
       email: 'alex@example.com',
       role: 'employee',
-      branch: user?.branch || 'danielito',
+      branch: defaultBranch,
       status: 'inactive',
       lastLogin: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
     },
@@ -92,7 +94,7 @@ export default function Settings() {
       name: newUser.name,
       email: newUser.email,
       role: newUser.role as 'employee' | 'manager' | 'executive',
-      branch: user?.branch || 'danielito',
+      branch: defaultBranch,
       status: 'active',
       lastLogin: new Date(),
     };
@@ -159,11 +161,7 @@ export default function Settings() {
 
           {/* General Settings */}
           <TabsContent value="general" className="space-y-6">
-            <Card className={`border-l-4 ${
-              user?.branch === 'danielito' ? 'border-l-[#1F2E28]' :
-              user?.branch === 'malaya' ? 'border-l-[#6E8368]' :
-              'border-l-[#B5651D]'
-            }`}>
+            <Card className="border-l-4" style={{ borderLeftColor: BRANCH_CONFIG[defaultBranch].color }}>
               <CardHeader>
                 <CardTitle className="font-corp-display">Branch Information</CardTitle>
                 <CardDescription>Manage your branch details and operating hours</CardDescription>

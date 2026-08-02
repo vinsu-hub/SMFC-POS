@@ -3,7 +3,28 @@
  * Defines data models for the multi-tenant POS platform
  */
 
-export type Branch = 'danielito' | 'malaya' | 'dden' | 'catering';
+import danielitoLogo from '@/assets/logos/danielito.png';
+import malayaLogo from '@/assets/logos/malaya.png';
+import ddenLogo from '@/assets/logos/dden.png';
+import dvenueLogo from '@/assets/logos/dvenue.png';
+import isabelasLogo from '@/assets/logos/isabelas.png';
+
+export type Branch =
+  | 'danielito-agapita'
+  | 'danielito-maitim'
+  | 'danielito-tagaytay'
+  | 'malaya-agapita'
+  | 'malaya-maitim'
+  | 'malaya-pitx'
+  | 'malaya-jsh'
+  | 'dden-agapita'
+  | 'dden-maitim'
+  | 'dvenue-agapita'
+  | 'dvenue-maitim'
+  | 'isabelas-agapita';
+
+export type CompanyKey = 'danielito' | 'malaya' | 'dden' | 'dvenue' | 'isabelas';
+
 export type Role = 'employee' | 'manager' | 'executive';
 
 export interface User {
@@ -158,7 +179,21 @@ export interface SyncStatus {
   pendingChanges: number;
 }
 
-export const BRANCH_CONFIG = {
+// Fonts/colors are functional UI wayfinding (badges, charts, borders), not
+// brand color - all 5 company logos share the same deep-teal ink, so the
+// logo (logoUrl) is the actual brand identity element.
+export const COMPANY_THEME: Record<
+  CompanyKey,
+  {
+    name: string;
+    color: string;
+    accentColor: string;
+    displayFont: string;
+    bodyFont: string;
+    theme: 'light' | 'dark';
+    logoUrl: string;
+  }
+> = {
   danielito: {
     name: "Danielito's Home Kitchen",
     color: '#1F2E28',
@@ -166,6 +201,7 @@ export const BRANCH_CONFIG = {
     displayFont: 'font-danielito-display',
     bodyFont: 'font-danielito-body',
     theme: 'light',
+    logoUrl: danielitoLogo,
   },
   malaya: {
     name: "Malaya's Cafe",
@@ -174,24 +210,88 @@ export const BRANCH_CONFIG = {
     displayFont: 'font-malaya-display',
     bodyFont: 'font-malaya-body',
     theme: 'light',
+    logoUrl: malayaLogo,
   },
   dden: {
-    name: "D'Den",
+    name: 'The Den',
     color: '#8B4513', // Saddle Brown for den atmosphere
     accentColor: '#D4A574', // Warm sand accent
     displayFont: 'font-dden-display',
     bodyFont: 'font-dden-body',
     theme: 'dark',
+    logoUrl: ddenLogo,
   },
-  catering: {
-    name: 'Saint Michael Food Corp Catering',
-    color: '#2A5C45', // Deep sage green
-    accentColor: '#C76A4F', // Terracotta
-    displayFont: 'font-catering-display',
-    bodyFont: 'font-catering-body',
+  dvenue: {
+    name: "D'Venue Events Place",
+    color: '#1B4B43', // Deep teal, formal/events feel
+    accentColor: '#C9A24B',
+    displayFont: 'font-dvenue-display',
+    bodyFont: 'font-dvenue-body',
     theme: 'light',
+    logoUrl: dvenueLogo,
+  },
+  isabelas: {
+    name: "Isabela's Signature Caterer",
+    color: '#6B2E3A', // Warm burgundy, signature catering feel
+    accentColor: '#E8D9B5',
+    displayFont: 'font-isabelas-display',
+    bodyFont: 'font-isabelas-body',
+    theme: 'light',
+    logoUrl: isabelasLogo,
   },
 };
+
+export const LOCATIONS: Array<{
+  themeKey: Branch;
+  companyKey: CompanyKey;
+  locationLabel: string;
+  city: string;
+}> = [
+  { themeKey: 'danielito-agapita', companyKey: 'danielito', locationLabel: 'Agapita Road', city: 'Los Baños, Laguna' },
+  { themeKey: 'danielito-maitim', companyKey: 'danielito', locationLabel: 'Bgy. Maitim Bay', city: 'Laguna' },
+  { themeKey: 'danielito-tagaytay', companyKey: 'danielito', locationLabel: 'Tagaytay City', city: 'Tagaytay' },
+  { themeKey: 'malaya-agapita', companyKey: 'malaya', locationLabel: 'Agapita', city: 'Los Baños, Laguna' },
+  { themeKey: 'malaya-maitim', companyKey: 'malaya', locationLabel: 'Brgy. Maitim Bay', city: 'Laguna' },
+  { themeKey: 'malaya-pitx', companyKey: 'malaya', locationLabel: '2/F PITX', city: 'Parañaque' },
+  { themeKey: 'malaya-jsh', companyKey: 'malaya', locationLabel: 'JSH Bldg, Grove', city: 'Los Baños' },
+  { themeKey: 'dden-agapita', companyKey: 'dden', locationLabel: 'Agapita Road', city: 'Los Baños, Laguna' },
+  { themeKey: 'dden-maitim', companyKey: 'dden', locationLabel: 'Brgy. Maitim Bay', city: 'Laguna' },
+  { themeKey: 'dvenue-agapita', companyKey: 'dvenue', locationLabel: 'Agapita Road', city: 'Los Baños, Laguna' },
+  { themeKey: 'dvenue-maitim', companyKey: 'dvenue', locationLabel: 'Brgy. Maitim Bay', city: 'Laguna' },
+  { themeKey: 'isabelas-agapita', companyKey: 'isabelas', locationLabel: 'Agapita Road', city: 'Los Baños, Laguna' },
+];
+
+export const BRANCH_CONFIG: Record<
+  Branch,
+  {
+    name: string;
+    city: string;
+    companyKey: CompanyKey;
+    color: string;
+    accentColor: string;
+    displayFont: string;
+    bodyFont: string;
+    theme: 'light' | 'dark';
+    logoUrl: string;
+  }
+> = Object.fromEntries(
+  LOCATIONS.map((loc) => {
+    const company = COMPANY_THEME[loc.companyKey];
+    return [
+      loc.themeKey,
+      {
+        ...company,
+        name: `${company.name} - ${loc.locationLabel}`,
+        city: loc.city,
+        companyKey: loc.companyKey,
+      },
+    ];
+  })
+) as Record<Branch, (typeof COMPANY_THEME)[CompanyKey] & { name: string; city: string; companyKey: CompanyKey }>;
+
+export function getCompanyKey(branch: Branch): CompanyKey {
+  return BRANCH_CONFIG[branch].companyKey;
+}
 
 export const LOSS_REASONS = [
   { value: 'spoilage', label: 'Spoilage' },

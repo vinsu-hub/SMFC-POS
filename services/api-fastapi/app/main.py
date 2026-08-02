@@ -2,9 +2,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routers import (
+    branches,
+    discounts,
     inventory,
     inventory_movements,
     kiosk,
+    stock_requests,
     transfers,
     utility,
     hr,
@@ -30,6 +33,9 @@ app.include_router(recipes.router)
 app.include_router(inventory.router)
 app.include_router(inventory_movements.router)
 app.include_router(transfers.router)
+app.include_router(branches.router)
+app.include_router(stock_requests.router)
+app.include_router(discounts.router)
 app.include_router(utility.router)
 app.include_router(hr.router)
 app.include_router(kiosk.router)

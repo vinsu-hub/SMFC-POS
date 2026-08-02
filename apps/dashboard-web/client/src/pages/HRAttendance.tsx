@@ -5,15 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Clock, Loader2, CheckCircle, XCircle, User, LogIn, LogOut, AlertCircle, RefreshCw, Calculator } from 'lucide-react';
+import { Clock, Loader2, CheckCircle, XCircle, User, UserPlus, LogOut, AlertCircle, RefreshCw, Calculator } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   ApiAttendanceLog,
   ApiPayrollRow,
-  ClockInRequest,
   ClockOutRequest,
-  clockIn,
   clockOut,
   fetchMyAttendance,
   fetchBranchAttendance,
@@ -21,7 +21,9 @@ import {
   fetchPayrollReceiptPdf,
   fetchEmployees,
   ApiEmployee,
+  ApiEmployeeCreated,
   ApiPayrollSummary,
+  createEmployee,
   updateEmployee,
 } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
@@ -56,7 +58,6 @@ export default function HRAttendance() {
   const [employees, setEmployees] = useState<ApiEmployee[]>([]);
   const [payrollSummary, setPayrollSummary] = useState<ApiPayrollSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [clockingIn, setClockingIn] = useState(false);
   const [clockingOut, setClockingOut] = useState(false);
   const [payrollPeriod, setPayrollPeriod] = useState(() => {
     const end = new Date();
@@ -66,6 +67,10 @@ export default function HRAttendance() {
   });
   const [payrollLoading, setPayrollLoading] = useState(false);
   const [receiptLoading, setReceiptLoading] = useState<string | null>(null);
+  const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
+  const [addEmployeeSubmitting, setAddEmployeeSubmitting] = useState(false);
+  const [newEmployeeForm, setNewEmployeeForm] = useState({ full_name: '', role: 'employee' as 'employee' | 'manager', position: '', pay_rate: '' });
+  const [createdEmployee, setCreatedEmployee] = useState<ApiEmployeeCreated | null>(null);
 
   useEffect(() => {
     if (!user?.id || !user?.branchId) return;
@@ -118,23 +123,6 @@ export default function HRAttendance() {
     }
   };
 
-  const handleClockIn = async () => {
-    if (!user?.branchId) return;
-    setClockingIn(true);
-    try {
-      await clockIn({ employee_id: user.id, branch_id: user.branchId });
-      toast.success('Clocked in successfully');
-      loadMyAttendance();
-      if (user.role === 'manager' || user.role === 'executive') {
-        loadBranchData();
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to clock in');
-    } finally {
-      setClockingIn(false);
-    }
-  };
-
   const handleClockOut = async () => {
     setClockingOut(true);
     try {
@@ -158,6 +146,37 @@ export default function HRAttendance() {
       loadBranchData();
     } catch (error) {
       toast.error('Failed to update pay rate');
+    }
+  };
+
+  const handleOpenAddEmployee = () => {
+    setNewEmployeeForm({ full_name: '', role: 'employee', position: '', pay_rate: '' });
+    setCreatedEmployee(null);
+    setAddEmployeeOpen(true);
+  };
+
+  const handleCreateEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.branchId || !newEmployeeForm.full_name.trim()) {
+      toast.error('Enter a name for the new employee');
+      return;
+    }
+    setAddEmployeeSubmitting(true);
+    try {
+      const created = await createEmployee({
+        branch_id: user.branchId,
+        full_name: newEmployeeForm.full_name.trim(),
+        role: newEmployeeForm.role,
+        position: newEmployeeForm.position || undefined,
+        pay_rate: newEmployeeForm.pay_rate ? parseFloat(newEmployeeForm.pay_rate) : undefined,
+      });
+      setCreatedEmployee(created);
+      toast.success('Employee created');
+      loadBranchData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create employee');
+    } finally {
+      setAddEmployeeSubmitting(false);
     }
   };
 
@@ -199,10 +218,10 @@ export default function HRAttendance() {
           <CardContent className="pt-0">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Current Time */}
-              <div className="md:col-span-1 text-center p-6 bg-muted/30 rounded-xl">
+              <div className="md:col-span-1 text-center p-6 bg-muted/30 rounded-xl min-w-0">
                 <p className="text-xs text-muted-foreground font-corp-body uppercase tracking-wide mb-1">Today</p>
                 <p className="text-lg font-corp-display font-medium">{formatDate(new Date().toISOString())}</p>
-                <p className="text-4xl font-corp-mono font-bold tabular-nums mt-2" style={{ color: branchColor }}>
+                <p className="text-stat-lg font-corp-mono font-bold tabular-nums mt-2 truncate" style={{ color: branchColor }}>
                   {currentTime.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
                 </p>
               </div>
@@ -219,14 +238,14 @@ export default function HRAttendance() {
                         </Badge>
                       </div>
                       <div className="grid grid-cols-2 gap-4 text-center">
-                        <div>
-                          <p className="text-3xl font-corp-mono font-bold tabular-nums" style={{ color: branchColor }}>
+                        <div className="min-w-0">
+                          <p className="text-stat-lg font-corp-mono font-bold tabular-nums truncate" style={{ color: branchColor }}>
                             {formatTime(myAttendance.clock_in)}
                           </p>
                           <p className="text-xs text-muted-foreground font-corp-body">Clock In Time</p>
                         </div>
-                        <div>
-                          <p className="text-3xl font-corp-mono font-bold tabular-nums text-primary">
+                        <div className="min-w-0">
+                          <p className="text-stat-lg font-corp-mono font-bold tabular-nums text-primary truncate">
                             {elapsedHours.toString().padStart(2, '0')}:{elapsedMinutes.toString().padStart(2, '0')}:{elapsedSeconds.toString().padStart(2, '0')}
                           </p>
                           <p className="text-xs text-muted-foreground font-corp-body">Elapsed</p>
@@ -245,22 +264,10 @@ export default function HRAttendance() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="space-y-4 text-center">
-                    <div className="p-6 bg-muted/30 rounded-xl">
-                      <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
-                      <p className="text-lg font-corp-body text-muted-foreground mb-2">Not Clocked In</p>
-                      <p className="text-sm text-muted-foreground font-corp-body">Start your shift to begin tracking hours</p>
-                    </div>
-                    <Button
-                      onClick={handleClockIn}
-                      disabled={clockingIn}
-                      size="lg"
-                      className="w-full bg-success hover:bg-success/90 text-success-foreground gap-2"
-                    >
-                      <LogIn className="w-5 h-5" />
-                      <span className="font-corp-display text-lg">Clock In</span>
-                      {clockingIn && <Loader2 className="w-5 h-5 animate-spin" />}
-                    </Button>
+                  <div className="p-6 bg-muted/30 rounded-xl text-center">
+                    <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground/30 mb-3" />
+                    <p className="text-lg font-corp-body text-muted-foreground mb-2">No Active Shift</p>
+                    <p className="text-sm text-muted-foreground font-corp-body">Clock in via the staff kiosk to begin tracking hours</p>
                   </div>
                 )}
               </div>
@@ -314,27 +321,27 @@ export default function HRAttendance() {
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <Card className="border-l-4" style={{ borderLeftColor: '#14524B' }}>
-                      <CardContent className="p-4 text-center">
+                      <CardContent className="p-4 text-center min-w-0">
                         <p className="text-sm text-muted-foreground font-corp-body">Total Hours</p>
-                        <p className="text-2xl font-corp-mono font-bold">{payrollSummary.total_hours.toFixed(1)}h</p>
+                        <p className="text-stat-md font-corp-mono font-bold truncate">{payrollSummary.total_hours.toFixed(1)}h</p>
                       </CardContent>
                     </Card>
                     <Card className="border-l-4" style={{ borderLeftColor: '#1E7A4C' }}>
-                      <CardContent className="p-4 text-center">
+                      <CardContent className="p-4 text-center min-w-0">
                         <p className="text-sm text-muted-foreground font-corp-body">Total Pay</p>
-                        <p className="text-2xl font-corp-mono font-bold text-success">{formatCurrency(payrollSummary.total_pay)}</p>
+                        <p className="text-stat-md font-corp-mono font-bold text-success truncate">{formatCurrency(payrollSummary.total_pay)}</p>
                       </CardContent>
                     </Card>
                     <Card className="border-l-4" style={{ borderLeftColor: '#C98A2C' }}>
-                      <CardContent className="p-4 text-center">
+                      <CardContent className="p-4 text-center min-w-0">
                         <p className="text-sm text-muted-foreground font-corp-body">Employees</p>
-                        <p className="text-2xl font-corp-mono font-bold">{payrollSummary.employee_count}</p>
+                        <p className="text-stat-md font-corp-mono font-bold truncate">{payrollSummary.employee_count}</p>
                       </CardContent>
                     </Card>
                     <Card className="border-l-4" style={{ borderLeftColor: '#6F6A5C' }}>
-                      <CardContent className="p-4 text-center">
+                      <CardContent className="p-4 text-center min-w-0">
                         <p className="text-sm text-muted-foreground font-corp-body">Avg Hours</p>
-                        <p className="text-2xl font-corp-mono font-bold">
+                        <p className="text-stat-md font-corp-mono font-bold truncate">
                           {payrollSummary.employee_count > 0 ? (payrollSummary.total_hours / payrollSummary.employee_count).toFixed(1) : 0}h
                         </p>
                       </CardContent>
@@ -386,11 +393,15 @@ export default function HRAttendance() {
 
             {/* Employee Management */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <CardTitle className="font-corp-display flex items-center gap-2">
                   <User className="w-6 h-6" />
                   Employee Management
                 </CardTitle>
+                <Button size="sm" onClick={handleOpenAddEmployee} className="gap-2">
+                  <UserPlus className="w-4 h-4" />
+                  <span className="font-corp-body">Add Employee</span>
+                </Button>
               </CardHeader>
               <CardContent>
                 {loading ? (
@@ -499,6 +510,89 @@ export default function HRAttendance() {
             </Card>
           </>
         )}
+
+        {/* Add Employee Dialog */}
+        <Dialog open={addEmployeeOpen} onOpenChange={setAddEmployeeOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-corp-display">
+                {createdEmployee ? 'Employee Created' : 'Add Employee'}
+              </DialogTitle>
+              <DialogDescription className="font-corp-body">
+                {createdEmployee
+                  ? 'Share these credentials with the new employee — they will not be shown again.'
+                  : 'Creates a login account and kiosk employee number for this branch.'}
+              </DialogDescription>
+            </DialogHeader>
+            {createdEmployee ? (
+              <div className="space-y-3">
+                <div className="space-y-2 rounded-lg border p-4 font-corp-mono text-sm">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Name</span><span>{createdEmployee.full_name}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span>{createdEmployee.email}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Password</span><span>{createdEmployee.default_password}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Kiosk PIN</span><span>{createdEmployee.default_pin}</span></div>
+                </div>
+                <Button className="w-full" onClick={() => setAddEmployeeOpen(false)}>
+                  Done
+                </Button>
+              </div>
+            ) : (
+              <form onSubmit={handleCreateEmployee} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground font-corp-body">Full Name</label>
+                  <Input
+                    value={newEmployeeForm.full_name}
+                    onChange={e => setNewEmployeeForm({ ...newEmployeeForm, full_name: e.target.value })}
+                    placeholder="Juan Dela Cruz"
+                    className="font-corp-body"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground font-corp-body">Role</label>
+                  <Select value={newEmployeeForm.role} onValueChange={v => setNewEmployeeForm({ ...newEmployeeForm, role: v as 'employee' | 'manager' })}>
+                    <SelectTrigger className="font-corp-body">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="employee">Employee</SelectItem>
+                      <SelectItem value="manager">Manager</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground font-corp-body">Position (optional)</label>
+                  <Input
+                    value={newEmployeeForm.position}
+                    onChange={e => setNewEmployeeForm({ ...newEmployeeForm, position: e.target.value })}
+                    placeholder="e.g. Barista, Line Cook"
+                    className="font-corp-body"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground font-corp-body">Pay Rate (optional)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={newEmployeeForm.pay_rate}
+                    onChange={e => setNewEmployeeForm({ ...newEmployeeForm, pay_rate: e.target.value })}
+                    placeholder="Hourly rate"
+                    className="font-corp-body font-corp-mono"
+                  />
+                </div>
+                <div className="flex gap-3 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setAddEmployeeOpen(false)} className="flex-1">
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={addEmployeeSubmitting} className="flex-1">
+                    {addEmployeeSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                    Create
+                  </Button>
+                </div>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

@@ -9,12 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
-import { BRANCH_CONFIG, type Branch } from '@/lib/types';
+import { BRANCH_CONFIG, COMPANY_THEME, getCompanyKey, type Branch, type CompanyKey } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { ApiOrganizationSummary, fetchMyOrganizationSummary } from '@/lib/api';
-import { ApiUtilitySummary, fetchOrgUtilitySummary, fetchTransfers } from '@/lib/api';
+import { ApiUtilitySummary, ApiBranch, fetchOrgUtilitySummary, fetchTransfers, fetchBranches } from '@/lib/api';
 import { supabase } from '@/lib/supabaseClient';
-import { AlertCircle, Banknote, Clock, Loader2, Package, TrendingUp, Users, Zap, Droplets, Send, RefreshCw } from 'lucide-react';
+import { AlertCircle, Banknote, Clock, Loader2, Package, TrendingUp, Users, Zap, Droplets, Flame, Send, RefreshCw } from 'lucide-react';
 
 interface MetricCardProps {
   title: string;
@@ -23,16 +23,151 @@ interface MetricCardProps {
   color: string;
 }
 
+interface BranchDetailPanelProps {
+  branch: {
+    key: Branch;
+    name: string;
+    color: string;
+    revenue: number;
+    cogs: number;
+    losses: number;
+    margin: number;
+    marginPercent: number;
+    todaysSales: number;
+    staffCount: number;
+    avgStaffUtilization: number;
+    expiringItems: number;
+    lowStockItems: number;
+    lastInventoryCount: string;
+    yesterdaysSales: number;
+    weeklyTrend: string;
+  };
+}
+
+// Extracted from the old flat per-location TabsContent so the same markup
+// can be reused inside a nested per-company/per-location tab structure.
+function BranchDetailPanel({ branch }: BranchDetailPanelProps) {
+  return (
+    <div className="space-y-6">
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard title="Today's Revenue" value={formatCurrency(branch.todaysSales)} icon={Banknote} color={branch.color} />
+        <MetricCard title="Weekly Trend" value={branch.weeklyTrend} icon={TrendingUp} color="#1E7A4C" />
+        <MetricCard title="Staff Count" value={`${branch.staffCount}`} icon={Users} color="#14524B" />
+        <MetricCard title="Margin %" value={`${branch.marginPercent}%`} icon={TrendingUp} color={branch.color} />
+      </div>
+
+      {/* Detailed Breakdown */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Financial Summary */}
+        <Card className="border-l-4" style={{ borderLeftColor: branch.color }}>
+          <CardHeader>
+            <CardTitle className="font-corp-display">Financial Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-foreground font-corp-body">Total Revenue</span>
+              <span className="font-corp-mono font-bold">{formatCurrency(branch.revenue)}</span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-foreground font-corp-body">COGS</span>
+              <span className="font-corp-mono font-bold">{formatCurrency(branch.cogs)}</span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-foreground font-corp-body">Losses</span>
+              <span className="font-corp-mono font-bold text-destructive">{formatCurrency(branch.losses)}</span>
+            </div>
+            <div className="flex items-center justify-between py-2 bg-secondary px-3 rounded">
+              <span className="text-foreground font-corp-body font-semibold">Gross Margin</span>
+              <span className="font-corp-mono font-bold text-lg" style={{ color: branch.color }}>
+                {formatCurrency(branch.margin)}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Operational Status */}
+        <Card className="border-l-4" style={{ borderLeftColor: branch.color }}>
+          <CardHeader>
+            <CardTitle className="font-corp-display">Operational Status</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-foreground font-corp-body">Staff Utilization</span>
+              <div className="flex items-center gap-2">
+                <div className="w-24 h-2 bg-secondary rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${branch.avgStaffUtilization}%`,
+                      backgroundColor: branch.color,
+                    }}
+                  />
+                </div>
+                <span className="font-corp-mono font-bold w-12 text-right">
+                  {branch.avgStaffUtilization}%
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-foreground font-corp-body">Expiring Items</span>
+              <span className="font-corp-mono font-bold text-warning">{branch.expiringItems}</span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-foreground font-corp-body">Low Stock Items</span>
+              <span className="font-corp-mono font-bold text-warning">{branch.lowStockItems}</span>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <span className="text-foreground font-corp-body flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                Last Inventory
+              </span>
+              <span className="font-corp-body text-sm text-muted-foreground">{branch.lastInventoryCount}</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Performance Comparison */}
+      <Card className="border-l-4" style={{ borderLeftColor: branch.color }}>
+        <CardHeader>
+          <CardTitle className="font-corp-display">Performance Comparison</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground font-corp-body mb-2">Today's Sales</p>
+              <p className="text-stat-md font-corp-mono font-bold text-foreground truncate">
+                {formatCurrency(branch.todaysSales)}
+              </p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground font-corp-body mb-2">Yesterday's Sales</p>
+              <p className="text-stat-md font-corp-mono font-bold text-muted-foreground truncate">
+                {formatCurrency(branch.yesterdaysSales)}
+              </p>
+            </div>
+          </div>
+          <div className="bg-secondary p-4 rounded min-w-0">
+            <p className="text-sm text-foreground font-corp-body mb-1">Weekly Trend</p>
+            <p className="text-stat-lg font-corp-mono font-bold text-success truncate">{branch.weeklyTrend}</p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function MetricCard({ title, value, icon: Icon, color }: MetricCardProps) {
   return (
     <Card>
       <CardContent className="pt-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground font-corp-body mb-1">{title}</p>
-            <p className="text-2xl font-corp-mono font-bold text-foreground">{value}</p>
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground font-corp-body mb-1 truncate">{title}</p>
+            <p className="text-stat-md font-corp-mono font-bold text-foreground truncate">{value}</p>
           </div>
-          <Icon className="w-8 h-8" style={{ color }} />
+          <Icon className="w-8 h-8 shrink-0" style={{ color }} />
         </div>
       </CardContent>
     </Card>
@@ -58,33 +193,18 @@ const BRANCH_OPERATIONAL_META: Record<
     weeklyTrend: string;
   }
 > = {
-  danielito: {
-    staffCount: 8,
-    avgStaffUtilization: 92,
-    expiringItems: 3,
-    lowStockItems: 2,
-    lastInventoryCount: '2 hours ago',
-    yesterdaysSales: 18880.25,
-    weeklyTrend: '+5.2%',
-  },
-  malaya: {
-    staffCount: 6,
-    avgStaffUtilization: 88,
-    expiringItems: 2,
-    lowStockItems: 1,
-    lastInventoryCount: '4 hours ago',
-    yesterdaysSales: 14720.0,
-    weeklyTrend: '+3.3%',
-  },
-  dden: {
-    staffCount: 7,
-    avgStaffUtilization: 95,
-    expiringItems: 4,
-    lowStockItems: 3,
-    lastInventoryCount: '1 hour ago',
-    yesterdaysSales: 25920.5,
-    weeklyTrend: '+3.7%',
-  },
+  'danielito-agapita': { staffCount: 4, avgStaffUtilization: 92, expiringItems: 3, lowStockItems: 2, lastInventoryCount: '2 hours ago', yesterdaysSales: 18880.25, weeklyTrend: '+5.2%' },
+  'danielito-maitim': { staffCount: 3, avgStaffUtilization: 89, expiringItems: 2, lowStockItems: 1, lastInventoryCount: '3 hours ago', yesterdaysSales: 15420.0, weeklyTrend: '+4.1%' },
+  'danielito-tagaytay': { staffCount: 3, avgStaffUtilization: 90, expiringItems: 1, lowStockItems: 1, lastInventoryCount: '5 hours ago', yesterdaysSales: 12980.5, weeklyTrend: '+2.8%' },
+  'malaya-agapita': { staffCount: 3, avgStaffUtilization: 88, expiringItems: 2, lowStockItems: 1, lastInventoryCount: '4 hours ago', yesterdaysSales: 14720.0, weeklyTrend: '+3.3%' },
+  'malaya-maitim': { staffCount: 3, avgStaffUtilization: 86, expiringItems: 1, lowStockItems: 1, lastInventoryCount: '2 hours ago', yesterdaysSales: 11250.75, weeklyTrend: '+2.5%' },
+  'malaya-pitx': { staffCount: 4, avgStaffUtilization: 91, expiringItems: 2, lowStockItems: 2, lastInventoryCount: '1 hour ago', yesterdaysSales: 19870.0, weeklyTrend: '+6.0%' },
+  'malaya-jsh': { staffCount: 2, avgStaffUtilization: 84, expiringItems: 1, lowStockItems: 0, lastInventoryCount: '6 hours ago', yesterdaysSales: 8940.25, weeklyTrend: '+1.9%' },
+  'dden-agapita': { staffCount: 4, avgStaffUtilization: 95, expiringItems: 4, lowStockItems: 3, lastInventoryCount: '1 hour ago', yesterdaysSales: 25920.5, weeklyTrend: '+3.7%' },
+  'dden-maitim': { staffCount: 3, avgStaffUtilization: 90, expiringItems: 2, lowStockItems: 2, lastInventoryCount: '3 hours ago', yesterdaysSales: 17650.0, weeklyTrend: '+2.9%' },
+  'dvenue-agapita': { staffCount: 3, avgStaffUtilization: 87, expiringItems: 1, lowStockItems: 1, lastInventoryCount: '5 hours ago', yesterdaysSales: 32100.0, weeklyTrend: '+4.4%' },
+  'dvenue-maitim': { staffCount: 2, avgStaffUtilization: 83, expiringItems: 0, lowStockItems: 1, lastInventoryCount: '8 hours ago', yesterdaysSales: 21400.5, weeklyTrend: '+3.1%' },
+  'isabelas-agapita': { staffCount: 2, avgStaffUtilization: 89, expiringItems: 1, lowStockItems: 1, lastInventoryCount: '3 hours ago', yesterdaysSales: 27650.0, weeklyTrend: '+5.5%' },
 };
 
 function matchBranchKey(branchName: string): Branch | null {
@@ -98,11 +218,14 @@ function matchBranchKey(branchName: string): Branch | null {
   return entry ? entry[0] : null;
 }
 
-const chartConfig: ChartConfig = {
-  danielito: { label: "Danielito's", color: BRANCH_CONFIG.danielito.color },
-  malaya: { label: "Malaya's", color: BRANCH_CONFIG.malaya.color },
-  dden: { label: "D'Den", color: BRANCH_CONFIG.dden.color },
-};
+// Built from all 12 locations (not just 3) so the revenue chart's
+// tooltip/legend labels cover every branch, not only the original 3.
+const chartConfig: ChartConfig = Object.fromEntries(
+  (Object.entries(BRANCH_CONFIG) as [Branch, (typeof BRANCH_CONFIG)[Branch]][]).map(([key, config]) => [
+    key,
+    { label: config.name, color: config.color },
+  ])
+);
 
 export default function CommandCenter() {
   const { user } = useAuth();
@@ -135,8 +258,18 @@ export default function CommandCenter() {
     const loadUtilitySummary = async () => {
       setUtilityLoading(true);
       try {
-        const data = await fetchOrgUtilitySummary(utilityPeriodStart, utilityPeriodEnd);
-        setUtilitySummary(data);
+        const [data, branches] = await Promise.all([
+          fetchOrgUtilitySummary(utilityPeriodStart, utilityPeriodEnd),
+          fetchBranches(),
+        ]);
+        // Legacy pre-restructure branches (old single-row "D'Den", "D' Bar",
+        // "Malaya's Cafe", etc.) still exist in the DB for their historical
+        // data, but shouldn't clutter this report - same real-location
+        // allow-list used to filter them out of the transfer/request pickers.
+        const validBranchIds = new Set(
+          branches.filter((b) => b.theme_key in BRANCH_CONFIG).map((b) => b.id)
+        );
+        setUtilitySummary(data.filter((u) => validBranchIds.has(u.branch_id)));
       } catch (error) {
         console.error('Failed to load utility summary:', error);
       } finally {
@@ -210,6 +343,7 @@ export default function CommandCenter() {
     const meta = BRANCH_OPERATIONAL_META[key];
     return [{
       key,
+      companyKey: getCompanyKey(key),
       name: b.branch_name,
       color: config.color,
       revenue: b.revenue,
@@ -223,6 +357,14 @@ export default function CommandCenter() {
     }];
   });
 
+  // Group locations by company for the nested company -> location tabs.
+  const companyKeys = Object.keys(COMPANY_THEME) as CompanyKey[];
+  const branchesByCompany = companyKeys.map((ck) => ({
+    key: ck,
+    name: COMPANY_THEME[ck].name,
+    locations: branches.filter((b) => b.companyKey === ck),
+  }));
+
   const totalRevenue = summary.total_revenue;
   const totalCogs = summary.total_cogs;
   const totalLosses = summary.total_losses;
@@ -231,7 +373,8 @@ export default function CommandCenter() {
   // Utility totals across all branches
   const totalElectricityCost = utilitySummary.reduce((sum, u) => sum + (u.electricity?.cost || 0), 0);
   const totalWaterCost = utilitySummary.reduce((sum, u) => sum + (u.water?.cost || 0), 0);
-  const totalUtilityCost = totalElectricityCost + totalWaterCost;
+  const totalGasCost = utilitySummary.reduce((sum, u) => sum + (u.gas?.cost || 0), 0);
+  const totalUtilityCost = totalElectricityCost + totalWaterCost + totalGasCost;
   const totalElectricityConsumption = utilitySummary.reduce((sum, u) => sum + (u.electricity?.consumption || 0), 0);
   const totalWaterConsumption = utilitySummary.reduce((sum, u) => sum + (u.water?.consumption || 0), 0);
 
@@ -255,19 +398,15 @@ export default function CommandCenter() {
     <DashboardLayout title="Command Center">
       <div className="p-6 space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-6">
+          <TabsList className="grid w-full grid-cols-7 mb-6">
             <TabsTrigger value="overview" className="font-corp-body">
               Overview
             </TabsTrigger>
-            <TabsTrigger value="danielito" className="font-corp-body">
-              Danielito's
-            </TabsTrigger>
-            <TabsTrigger value="malaya" className="font-corp-body">
-              Malaya's
-            </TabsTrigger>
-            <TabsTrigger value="dden" className="font-corp-body">
-              D'Den
-            </TabsTrigger>
+            {branchesByCompany.map((company) => (
+              <TabsTrigger key={company.key} value={company.key} className="font-corp-body">
+                {company.name}
+              </TabsTrigger>
+            ))}
             <TabsTrigger value="utility-monitor" className="font-corp-body">
               Utility Monitor
             </TabsTrigger>
@@ -384,7 +523,7 @@ export default function CommandCenter() {
                     <Button
                       variant="outline"
                       className="w-full font-corp-body text-sm"
-                      onClick={() => setActiveTab(branch.key)}
+                      onClick={() => setActiveTab(branch.companyKey)}
                     >
                       View Details
                     </Button>
@@ -478,141 +617,34 @@ export default function CommandCenter() {
             </Card>
           </TabsContent>
 
-          {/* Individual Branch Tabs */}
-          {branches.map((branch) => (
-            <TabsContent key={branch.key} value={branch.key} className="space-y-6">
-              {/* Branch Header */}
-              <Card className="border-l-4" style={{ borderLeftColor: branch.color }}>
-                <CardHeader style={{ backgroundColor: branch.color + '10' }}>
-                  <CardTitle className="font-corp-display text-2xl">{branch.name}</CardTitle>
-                </CardHeader>
-              </Card>
-
-              {/* Key Metrics */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <MetricCard
-                  title="Today's Revenue"
-                  value={formatCurrency(branch.todaysSales)}
-                  icon={Banknote}
-                  color={branch.color}
-                />
-                <MetricCard
-                  title="Weekly Trend"
-                  value={branch.weeklyTrend}
-                  icon={TrendingUp}
-                  color="#1E7A4C"
-                />
-                <MetricCard
-                  title="Staff Count"
-                  value={`${branch.staffCount}`}
-                  icon={Users}
-                  color="#14524B"
-                />
-                <MetricCard
-                  title="Margin %"
-                  value={`${branch.marginPercent}%`}
-                  icon={TrendingUp}
-                  color={branch.color}
-                />
-              </div>
-
-              {/* Detailed Breakdown */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Financial Summary */}
-                <Card className="border-l-4" style={{ borderLeftColor: branch.color }}>
-                  <CardHeader>
-                    <CardTitle className="font-corp-display">Financial Summary</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between py-2 border-b">
-                      <span className="text-foreground font-corp-body">Total Revenue</span>
-                      <span className="font-corp-mono font-bold">{formatCurrency(branch.revenue)}</span>
-                    </div>
-                    <div className="flex items-center justify-between py-2 border-b">
-                      <span className="text-foreground font-corp-body">COGS</span>
-                      <span className="font-corp-mono font-bold">{formatCurrency(branch.cogs)}</span>
-                    </div>
-                    <div className="flex items-center justify-between py-2 border-b">
-                      <span className="text-foreground font-corp-body">Losses</span>
-                      <span className="font-corp-mono font-bold text-destructive">{formatCurrency(branch.losses)}</span>
-                    </div>
-                    <div className="flex items-center justify-between py-2 bg-secondary px-3 rounded">
-                      <span className="text-foreground font-corp-body font-semibold">Gross Margin</span>
-                      <span className="font-corp-mono font-bold text-lg" style={{ color: branch.color }}>
-                        {formatCurrency(branch.margin)}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Operational Status */}
-                <Card className="border-l-4" style={{ borderLeftColor: branch.color }}>
-                  <CardHeader>
-                    <CardTitle className="font-corp-display">Operational Status</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between py-2 border-b">
-                      <span className="text-foreground font-corp-body">Staff Utilization</span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-24 h-2 bg-secondary rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              width: `${branch.avgStaffUtilization}%`,
-                              backgroundColor: branch.color,
-                            }}
-                          />
-                        </div>
-                        <span className="font-corp-mono font-bold w-12 text-right">
-                          {branch.avgStaffUtilization}%
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between py-2 border-b">
-                      <span className="text-foreground font-corp-body">Expiring Items</span>
-                      <span className="font-corp-mono font-bold text-warning">{branch.expiringItems}</span>
-                    </div>
-                    <div className="flex items-center justify-between py-2 border-b">
-                      <span className="text-foreground font-corp-body">Low Stock Items</span>
-                      <span className="font-corp-mono font-bold text-warning">{branch.lowStockItems}</span>
-                    </div>
-                    <div className="flex items-center justify-between py-2">
-                      <span className="text-foreground font-corp-body flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
-                        Last Inventory
-                      </span>
-                      <span className="font-corp-body text-sm text-muted-foreground">{branch.lastInventoryCount}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Performance Comparison */}
-              <Card className="border-l-4" style={{ borderLeftColor: branch.color }}>
-                <CardHeader>
-                  <CardTitle className="font-corp-display">Performance Comparison</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground font-corp-body mb-2">Today's Sales</p>
-                      <p className="text-2xl font-corp-mono font-bold text-foreground">
-                        {formatCurrency(branch.todaysSales)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground font-corp-body mb-2">Yesterday's Sales</p>
-                      <p className="text-2xl font-corp-mono font-bold text-muted-foreground">
-                        {formatCurrency(branch.yesterdaysSales)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="bg-secondary p-4 rounded">
-                    <p className="text-sm text-foreground font-corp-body mb-1">Weekly Trend</p>
-                    <p className="text-3xl font-corp-mono font-bold text-success">{branch.weeklyTrend}</p>
-                  </div>
-                </CardContent>
-              </Card>
+          {/* Company Tabs — each nests one sub-tab per location under that company */}
+          {branchesByCompany.map((company) => (
+            <TabsContent key={company.key} value={company.key} className="space-y-6">
+              {company.locations.length === 0 ? (
+                <p className="text-center text-muted-foreground py-12 font-corp-body">
+                  No revenue data yet for {company.name}.
+                </p>
+              ) : (
+                <Tabs defaultValue={company.locations[0].key} className="w-full">
+                  <TabsList className="flex w-full flex-wrap h-auto gap-2 bg-transparent p-0 justify-start">
+                    {company.locations.map((branch) => (
+                      <TabsTrigger key={branch.key} value={branch.key} className="font-corp-body">
+                        {branch.name}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                  {company.locations.map((branch) => (
+                    <TabsContent key={branch.key} value={branch.key} className="space-y-6 mt-4">
+                      <Card className="border-l-4" style={{ borderLeftColor: branch.color }}>
+                        <CardHeader style={{ backgroundColor: branch.color + '10' }}>
+                          <CardTitle className="font-corp-display text-2xl">{branch.name}</CardTitle>
+                        </CardHeader>
+                      </Card>
+                      <BranchDetailPanel branch={branch} />
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              )}
             </TabsContent>
           ))}
 
@@ -651,7 +683,7 @@ export default function CommandCenter() {
             </Card>
 
             {/* Corporate Utility Totals */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               <MetricCard
                 title="Electricity Used"
                 value={`${totalElectricityConsumption.toFixed(1)} kWh`}
@@ -675,6 +707,12 @@ export default function CommandCenter() {
                 value={formatCurrency(totalWaterCost)}
                 icon={Droplets}
                 color="#14524B"
+              />
+              <MetricCard
+                title="Gas Cost"
+                value={formatCurrency(totalGasCost)}
+                icon={Flame}
+                color="#C1440E"
               />
               <MetricCard
                 title="Total Utility Cost"
@@ -738,6 +776,7 @@ export default function CommandCenter() {
                       <TableHead className="text-right">Electricity Cost</TableHead>
                       <TableHead className="text-right">Water (m³)</TableHead>
                       <TableHead className="text-right">Water Cost</TableHead>
+                      <TableHead className="text-right">Gas Cost</TableHead>
                       <TableHead className="text-right">Total Cost</TableHead>
                       <TableHead className="text-right">Readings</TableHead>
                     </TableRow>
@@ -754,11 +793,12 @@ export default function CommandCenter() {
                         </TableCell>
                         <TableCell className="text-right font-corp-mono">{u.water.consumption.toFixed(1)}</TableCell>
                         <TableCell className="text-right font-corp-mono">{formatCurrency(u.water.cost)}</TableCell>
+                        <TableCell className="text-right font-corp-mono">{formatCurrency(u.gas?.cost || 0)}</TableCell>
                         <TableCell className="text-right font-corp-mono font-bold">
                           {formatCurrency(u.total_cost)}
                         </TableCell>
                         <TableCell className="text-right font-corp-mono text-muted-foreground">
-                          {u.electricity.readings_count + u.water.readings_count}
+                          {u.electricity.readings_count + u.water.readings_count + (u.gas?.readings_count || 0)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -770,9 +810,10 @@ export default function CommandCenter() {
                       <TableCell className="text-right font-corp-mono">{formatCurrency(totalElectricityCost)}</TableCell>
                       <TableCell className="text-right font-corp-mono">{totalWaterConsumption.toFixed(1)}</TableCell>
                       <TableCell className="text-right font-corp-mono">{formatCurrency(totalWaterCost)}</TableCell>
+                      <TableCell className="text-right font-corp-mono">{formatCurrency(totalGasCost)}</TableCell>
                       <TableCell className="text-right font-corp-mono">{formatCurrency(totalUtilityCost)}</TableCell>
                       <TableCell className="text-right font-corp-mono">
-                        {utilitySummary.reduce((sum, u) => sum + u.electricity.readings_count + u.water.readings_count, 0)}
+                        {utilitySummary.reduce((sum, u) => sum + u.electricity.readings_count + u.water.readings_count + (u.gas?.readings_count || 0), 0)}
                       </TableCell>
                     </TableRow>
                   </TableBody>

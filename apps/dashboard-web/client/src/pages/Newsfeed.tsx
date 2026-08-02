@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertTriangle, Package, Users, Info, Clock, DollarSign, TrendingUp } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { getCompanyKey } from '@/lib/types';
 
 interface NewsItem {
   id: string;
@@ -224,9 +225,11 @@ export default function Newsfeed() {
   const getFilteredItems = () => {
     let filtered = allItems;
 
-    // If employee or manager, only show their branch
-    if (user?.role === 'employee' || user?.role === 'manager') {
-      filtered = filtered.filter((item) => item.branch === user.branch);
+    // If employee or manager, only show their company's mock alerts
+    // (this newsfeed's items are mocked at company granularity, not per-location)
+    if ((user?.role === 'employee' || user?.role === 'manager') && user.branch) {
+      const companyKey = getCompanyKey(user.branch);
+      filtered = filtered.filter((item) => item.branch === companyKey);
     }
 
     // Apply type filter
@@ -285,14 +288,14 @@ export default function Newsfeed() {
   const hrItems = filteredItems.filter((item) => item.type === 'hr');
   const generalItems = filteredItems.filter((item) => item.type === 'general');
 
-  // Get user's branch metrics
-  const userBranchMetrics = user?.branch ? branchMetrics[user.branch] : null;
+  // Get user's branch metrics (mocked at company granularity)
+  const userBranchMetrics = user?.branch ? branchMetrics[getCompanyKey(user.branch)] : null;
 
   // Determine which branches to show
-  const visibleBranches = user?.role === 'executive' 
+  const visibleBranches = user?.role === 'executive'
     ? ['danielito', 'malaya', 'dden']
-    : user?.branch 
-    ? [user.branch]
+    : user?.branch
+    ? [getCompanyKey(user.branch)]
     : [];
 
   const MetricCard = ({ title, value, icon: Icon, color }: any) => (

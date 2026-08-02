@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, AlertCircle, Loader2, Truck, ArrowUpRight, ArrowDownLeft, Package, Send, RefreshCw } from 'lucide-react';
+import { Plus, AlertCircle, Loader2, Truck, ArrowUpRight, ArrowDownLeft, Package, Send, RefreshCw, PackagePlus, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 import { BRANCH_CONFIG } from '@/lib/types';
@@ -26,6 +26,13 @@ import {
   confirmTransfer,
   rejectTransfer,
   ApiTransfer,
+  fetchBranches,
+  ApiBranch,
+  createStockRequest,
+  fetchStockRequests,
+  fulfillStockRequest,
+  declineStockRequest,
+  ApiStockRequest,
 } from '@/lib/api';
 
 const MOVEMENT_TYPES: { value: MovementType; label: string; icon: React.ReactNode; color: string }[] = [
@@ -67,6 +74,8 @@ export default function InventoryMovements() {
   const [ingredients, setIngredients] = useState<ApiIngredient[]>([]);
   const [movements, setMovements] = useState<ApiInventoryMovement[]>([]);
   const [transfers, setTransfers] = useState<ApiTransfer[]>([]);
+  const [branches, setBranches] = useState<ApiBranch[]>([]);
+  const [stockRequests, setStockRequests] = useState<ApiStockRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -76,6 +85,19 @@ export default function InventoryMovements() {
     ingredientId: '',
     quantity: '',
     reason: '',
+    toBranchId: '',
+    unitCost: '',
+  });
+
+  // Request Stock dialog - separate ingredient list scoped to the chosen
+  // source branch, since the requester doesn't know that branch's stock IDs.
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [sourceBranchIngredients, setSourceBranchIngredients] = useState<ApiIngredient[]>([]);
+  const [requestForm, setRequestForm] = useState({
+    sourceBranchId: '',
+    ingredientId: '',
+    quantity: '',
   });
 
   useEffect(() => {
@@ -87,14 +109,18 @@ export default function InventoryMovements() {
     if (!user?.branchId) return;
     setLoading(true);
     try {
-      const [inv, mov, trf] = await Promise.all([
+      const [inv, mov, trf, br, reqs] = await Promise.all([
         fetchInventory(user.branchId),
         fetchBranchInventoryMovements(user.branchId),
         fetchTransfers(user.branchId),
+        fetchBranches(),
+        fetchStockRequests(user.branchId),
       ]);
       setIngredients(inv);
       setMovements(mov);
       setTransfers(trf);
+      setBranches(br);
+      setStockRequests(reqs);
     } catch (error) {
       toast.error('Failed to load inventory movements');
     } finally {
@@ -102,24 +128,42 @@ export default function InventoryMovements() {
     }
   };
 
+  const branchName = (branchId: string) => branches.find((b) => b.id === branchId)?.name ?? branchId;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.ingredientId || !form.quantity) {
       toast.error('Please select an ingredient and enter quantity');
       return;
     }
+    if (selectedType === 'transfer_out' && !form.toBranchId) {
+      toast.error('Select a destination branch');
+      return;
+    }
     setSubmitting(true);
     try {
-      await createInventoryMovement({
-        branch_id: user.branchId!,
-        ingredient_id: form.ingredientId,
-        type: selectedType,
-        quantity: parseFloat(form.quantity),
-        reason: form.reason || undefined,
-        employee_id: user.id,
-      });
+      if (selectedType === 'transfer_out') {
+        await createTransfer({
+          from_branch_id: user.branchId!,
+          to_branch_id: form.toBranchId,
+          ingredient_id: form.ingredientId,
+          quantity: parseFloat(form.quantity),
+          initiated_by: user.id,
+          notes: form.reason || undefined,
+        });
+      } else {
+        await createInventoryMovement({
+          branch_id: user.branchId!,
+          ingredient_id: form.ingredientId,
+          type: selectedType,
+          quantity: parseFloat(form.quantity),
+          reason: form.reason || undefined,
+          employee_id: user.id,
+          unit_cost: selectedType === 'delivery' && form.unitCost ? parseFloat(form.unitCost) : undefined,
+        });
+      }
       toast.success('Movement recorded');
-      setForm({ ingredientId: '', quantity: '', reason: '' });
+      setForm({ ingredientId: '', quantity: '', reason: '', toBranchId: '', unitCost: '' });
       setDialogOpen(false);
       loadData();
     } catch (error) {
@@ -131,7 +175,7 @@ export default function InventoryMovements() {
 
   const handleOpenDialog = (type: MovementType) => {
     setSelectedType(type);
-    setForm({ ingredientId: '', quantity: '', reason: '' });
+    setForm({ ingredientId: '', quantity: '', reason: '', toBranchId: '', unitCost: '' });
     setDialogOpen(true);
   };
 
@@ -156,7 +200,76 @@ export default function InventoryMovements() {
     }
   };
 
-  const branchColor = user?.branch ? BRANCH_CONFIG[user.branch as keyof typeof BRANCH_CONFIG]?.color : '#14524B';
+  const handleOpenRequestDialog = () => {
+    setRequestForm({ sourceBranchId: '', ingredientId: '', quantity: '' });
+    setSourceBranchIngredients([]);
+    setRequestDialogOpen(true);
+  };
+
+  const handleSourceBranchChange = async (branchId: string) => {
+    setRequestForm((f) => ({ ...f, sourceBranchId: branchId, ingredientId: '' }));
+    try {
+      const inv = await fetchInventory(branchId);
+      setSourceBranchIngredients(inv);
+    } catch (error) {
+      toast.error('Failed to load that branch\'s stock');
+    }
+  };
+
+  const handleSubmitRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!requestForm.sourceBranchId || !requestForm.ingredientId || !requestForm.quantity) {
+      toast.error('Select a branch, ingredient, and quantity');
+      return;
+    }
+    setRequestSubmitting(true);
+    try {
+      await createStockRequest({
+        requesting_branch_id: user.branchId!,
+        source_branch_id: requestForm.sourceBranchId,
+        ingredient_id: requestForm.ingredientId,
+        quantity: parseFloat(requestForm.quantity),
+        requested_by: user.id,
+      });
+      toast.success('Stock request sent');
+      setRequestDialogOpen(false);
+      loadData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to send request');
+    } finally {
+      setRequestSubmitting(false);
+    }
+  };
+
+  const handleFulfillRequest = async (requestId: string) => {
+    try {
+      await fulfillStockRequest(requestId);
+      toast.success('Request fulfilled - transfer created');
+      loadData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to fulfill request');
+    }
+  };
+
+  const handleDeclineRequest = async (requestId: string) => {
+    if (!confirm('Decline this stock request?')) return;
+    try {
+      await declineStockRequest(requestId);
+      toast.success('Request declined');
+      loadData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to decline request');
+    }
+  };
+
+  const branchColor = user?.branch ? BRANCH_CONFIG[user.branch]?.color : '#14524B';
+  // Excludes legacy/orphaned branches from before the location restructure
+  // (e.g. old single-row "D'Den"/"D' Bar"/"Malaya's Cafe") — those rows stay
+  // in the database for their historical transaction data, but shouldn't be
+  // pickable as transfer/request destinations. BRANCH_CONFIG's keys are
+  // exactly the current 12 real location theme_keys.
+  const otherBranches = branches.filter((b) => b.id !== user?.branchId && b.theme_key in BRANCH_CONFIG);
+  const pendingIncomingRequests = stockRequests.filter((r) => r.source_branch_id === user?.branchId && r.status === 'pending');
 
   return (
     <DashboardLayout title="Inventory Movements">
@@ -234,6 +347,14 @@ export default function InventoryMovements() {
               ))}
               <Button
                 variant="outline"
+                onClick={handleOpenRequestDialog}
+                className="gap-2"
+              >
+                <PackagePlus className="w-4 h-4" />
+                <span className="font-corp-body">Request Stock</span>
+              </Button>
+              <Button
+                variant="outline"
                 onClick={loadData}
                 className="gap-2 ml-auto"
               >
@@ -272,6 +393,23 @@ export default function InventoryMovements() {
                   </SelectContent>
                 </Select>
               </div>
+              {selectedType === 'transfer_out' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground font-corp-body">Destination Branch</label>
+                  <Select value={form.toBranchId} onValueChange={v => setForm({ ...form, toBranchId: v })}>
+                    <SelectTrigger className="font-corp-body">
+                      <SelectValue placeholder="Select destination branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {otherBranches.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground font-corp-body">Quantity</label>
                 <Input
@@ -284,6 +422,20 @@ export default function InventoryMovements() {
                   className="font-corp-body font-corp-mono"
                 />
               </div>
+              {selectedType === 'delivery' && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground font-corp-body">Cost per Unit (optional)</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={form.unitCost}
+                    onChange={e => setForm({ ...form, unitCost: e.target.value })}
+                    placeholder="Updates the ingredient's cost basis"
+                    className="font-corp-body font-corp-mono"
+                  />
+                </div>
+              )}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground font-corp-body">Reason (optional)</label>
                 <Input
@@ -359,7 +511,7 @@ export default function InventoryMovements() {
           </CardContent>
         </Card>
 
-        {/* Pending Transfers */}
+        {/* Pending Transfers - incoming queue for this branch to confirm/reject */}
         {transfers.length > 0 && (
           <Card>
             <CardHeader>
@@ -373,6 +525,7 @@ export default function InventoryMovements() {
                       <TableHead>From Branch</TableHead>
                       <TableHead>Ingredient</TableHead>
                       <TableHead className="text-right w-24">Qty</TableHead>
+                      <TableHead>Sent By</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="w-40">Initiated</TableHead>
                       <TableHead className="w-40">Actions</TableHead>
@@ -383,9 +536,10 @@ export default function InventoryMovements() {
                       .filter(t => t.to_branch_id === user.branchId && t.status === 'pending')
                       .map((t) => (
                         <TableRow key={t.id} className="font-corp-body">
-                          <TableCell>{BRANCH_CONFIG[t.from_branch_id as keyof typeof BRANCH_CONFIG]?.name ?? t.from_branch_id}</TableCell>
-                          <TableCell>{t.ingredient_id}</TableCell>
+                          <TableCell>{branchName(t.from_branch_id)}</TableCell>
+                          <TableCell>{t.ingredient_name ?? t.ingredient_id}</TableCell>
                           <TableCell className="text-right font-corp-mono">{t.quantity}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">{t.initiated_by_name ?? '—'}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className={TRANSFER_STATUS_COLORS[t.status]}>
                               {t.status}
@@ -410,6 +564,123 @@ export default function InventoryMovements() {
             </CardContent>
           </Card>
         )}
+
+        {/* Requests to Fulfill - stock requests where this branch is the source */}
+        {pendingIncomingRequests.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-corp-display">Requests to Fulfill</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="font-corp-body">
+                      <TableHead>Requesting Branch</TableHead>
+                      <TableHead>Ingredient</TableHead>
+                      <TableHead className="text-right w-24">Qty</TableHead>
+                      <TableHead>Requested By</TableHead>
+                      <TableHead className="w-40">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingIncomingRequests.map((r) => (
+                      <TableRow key={r.id} className="font-corp-body">
+                        <TableCell>{branchName(r.requesting_branch_id)}</TableCell>
+                        <TableCell>{r.ingredient_name ?? r.ingredient_id}</TableCell>
+                        <TableCell className="text-right font-corp-mono">{r.quantity}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{r.requested_by_name ?? '—'}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="default" onClick={() => handleFulfillRequest(r.id)} className="text-success">
+                              <CheckCircle2 className="w-3 h-3 mr-1" /> Convert to Transfer
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={() => handleDeclineRequest(r.id)} className="text-destructive">
+                              <AlertCircle className="w-3 h-3 mr-1" /> Decline
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Request Stock Dialog */}
+        <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-corp-display">Request Stock</DialogTitle>
+              <DialogDescription className="font-corp-body">
+                Ask another branch to send you stock. They'll see this as a pending request to fulfill.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmitRequest} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground font-corp-body">Source Branch</label>
+                <Select value={requestForm.sourceBranchId} onValueChange={handleSourceBranchChange}>
+                  <SelectTrigger className="font-corp-body">
+                    <SelectValue placeholder="Select branch to request from" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {otherBranches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground font-corp-body">Ingredient</label>
+                <Select
+                  value={requestForm.ingredientId}
+                  onValueChange={v => setRequestForm({ ...requestForm, ingredientId: v })}
+                  disabled={!requestForm.sourceBranchId}
+                >
+                  <SelectTrigger className="font-corp-body">
+                    <SelectValue placeholder={requestForm.sourceBranchId ? 'Select ingredient' : 'Select a branch first'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sourceBranchIngredients.map((ing) => (
+                      <SelectItem key={ing.id} value={ing.id}>
+                        {ing.name} ({ing.current_stock} {ing.unit})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground font-corp-body">Quantity</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={requestForm.quantity}
+                  onChange={e => setRequestForm({ ...requestForm, quantity: e.target.value })}
+                  placeholder="Enter quantity"
+                  className="font-corp-body font-corp-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground font-corp-body">Requested By</label>
+                <Input value={user?.name ?? ''} disabled className="font-corp-body" />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <Button type="button" variant="outline" onClick={() => setRequestDialogOpen(false)} className="flex-1">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={requestSubmitting} className="flex-1">
+                  {requestSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  Send Request
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

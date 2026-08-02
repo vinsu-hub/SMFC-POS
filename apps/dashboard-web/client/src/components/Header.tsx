@@ -22,7 +22,7 @@ export function Header({ title, showLogo = true, onMenuClick }: HeaderProps) {
 
   const branchConfig = user.branch
     ? BRANCH_CONFIG[user.branch]
-    : { name: 'Corporate HQ', color: '#1B2A4A' };
+    : { name: 'Corporate HQ', color: '#1B2A4A', logoUrl: undefined as string | undefined };
 
   const getSyncDotColor = () => {
     switch (syncStatus.status) {
@@ -54,13 +54,16 @@ export function Header({ title, showLogo = true, onMenuClick }: HeaderProps) {
           )}
           {showLogo && (
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-l2-raised"
-              style={{ backgroundColor: branchConfig.color }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-l2-raised overflow-hidden"
+              style={{ backgroundColor: branchConfig.logoUrl ? '#fff' : branchConfig.color }}
             >
-              {user.branch === 'danielito' && 'D'}
-              {user.branch === 'malaya' && 'M'}
-              {user.branch === 'dden' && 'D'}
-              {!user.branch && 'HQ'}
+              {branchConfig.logoUrl ? (
+                <img src={branchConfig.logoUrl} alt={branchConfig.name} className="w-full h-full object-contain p-0.5" />
+              ) : !user.branch ? (
+                'HQ'
+              ) : (
+                branchConfig.name.charAt(0).toUpperCase()
+              )}
             </div>
           )}
           <div className="min-w-0">

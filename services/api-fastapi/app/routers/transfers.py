@@ -3,9 +3,80 @@ from datetime import datetime
 
 from app.auth import CurrentUser, get_current_user, require_branch_access
 from app.deps import get_supabase
-from app.schemas import TransferCreate, TransferResponse, TransferUpdate
+from app.schemas import TransferCreate, TransferResponse
 
 router = APIRouter(tags=["transfers"])
+
+
+def _do_transfer(
+    from_branch_id: str,
+    to_branch_id: str,
+    ingredient_id: str,
+    quantity: float,
+    initiated_by: str,
+    notes: str | None = None,
+) -> dict:
+    """Core stock-deduction + pending-transfer-creation logic. Shared by the
+    direct create_transfer endpoint and stock_requests fulfillment, which
+    both need to deduct source stock and create the same pending record.
+    """
+    supabase = get_supabase()
+
+    ingredient_result = (
+        supabase.table("ingredients")
+        .select("branch_id, unit_cost, current_stock")
+        .eq("id", ingredient_id)
+        .maybe_single()
+        .execute()
+    )
+    if not ingredient_result or not ingredient_result.data:
+        raise HTTPException(status_code=404, detail="Ingredient not found")
+    if ingredient_result.data["branch_id"] != from_branch_id:
+        raise HTTPException(status_code=400, detail="Ingredient does not belong to source branch")
+
+    current_stock = float(ingredient_result.data["current_stock"])
+    if current_stock < quantity:
+        raise HTTPException(status_code=400, detail="Insufficient stock for transfer")
+
+    # Deduct from source branch immediately (TransOUT)
+    new_stock = current_stock - quantity
+    supabase.table("ingredients").update({"current_stock": new_stock}).eq(
+        "id", ingredient_id
+    ).execute()
+
+    # Create transfer record (pending)
+    insert_result = (
+        supabase.table("transfers")
+        .insert(
+            {
+                "from_branch_id": from_branch_id,
+                "to_branch_id": to_branch_id,
+                "ingredient_id": ingredient_id,
+                "quantity": quantity,
+                "status": "pending",
+                "initiated_by": initiated_by,
+                "notes": notes,
+            }
+        )
+        .execute()
+    )
+    transfer = insert_result.data[0]
+
+    # Log inventory movement for source branch (transfer_out)
+    supabase.table("inventory_movements").insert(
+        {
+            "branch_id": from_branch_id,
+            "ingredient_id": ingredient_id,
+            "type": "transfer_out",
+            "quantity": quantity,
+            "reason": notes or "Inter-branch transfer",
+            "reference_id": transfer["id"],
+            "employee_id": initiated_by,
+            "unit_cost_snapshot": float(ingredient_result.data["unit_cost"]),
+        }
+    ).execute()
+
+    return transfer
 
 
 @router.post("/transfers", response_model=TransferResponse)
@@ -19,75 +90,14 @@ def create_transfer(
     if body.initiated_by != user.id:
         raise HTTPException(status_code=403, detail="Cannot initiate transfer under another employee's id")
 
-    supabase = get_supabase()
-
-    # Validate ingredient exists and belongs to from_branch
-    ingredient_result = (
-        supabase.table("ingredients")
-        .select("branch_id, unit_cost, current_stock")
-        .eq("id", body.ingredient_id)
-        .maybe_single()
-        .execute()
+    return _do_transfer(
+        from_branch_id=body.from_branch_id,
+        to_branch_id=body.to_branch_id,
+        ingredient_id=body.ingredient_id,
+        quantity=body.quantity,
+        initiated_by=body.initiated_by,
+        notes=body.notes,
     )
-    if not ingredient_result or not ingredient_result.data:
-        raise HTTPException(status_code=404, detail="Ingredient not found")
-    if ingredient_result.data["branch_id"] != body.from_branch_id:
-        raise HTTPException(status_code=400, detail="Ingredient does not belong to source branch")
-
-    # Validate to_branch exists and has this ingredient (or will receive it)
-    to_ingredient = (
-        supabase.table("ingredients")
-        .select("id")
-        .eq("branch_id", body.to_branch_id)
-        .eq("name", ingredient_result.data.get("name", ""))
-        .maybe_single()
-        .execute()
-    )
-    # If ingredient doesn't exist in target branch, it will be created on receipt
-
-    current_stock = float(ingredient_result.data["current_stock"])
-    if current_stock < body.quantity:
-        raise HTTPException(status_code=400, detail="Insufficient stock for transfer")
-
-    # Deduct from source branch immediately (TransOUT)
-    new_stock = current_stock - body.quantity
-    supabase.table("ingredients").update({"current_stock": new_stock}).eq(
-        "id", body.ingredient_id
-    ).execute()
-
-    # Create transfer record (pending)
-    insert_result = (
-        supabase.table("transfers")
-        .insert(
-            {
-                "from_branch_id": body.from_branch_id,
-                "to_branch_id": body.to_branch_id,
-                "ingredient_id": body.ingredient_id,
-                "quantity": body.quantity,
-                "status": "pending",
-                "initiated_by": body.initiated_by,
-                "notes": body.notes,
-            }
-        )
-        .execute()
-    )
-    transfer = insert_result.data[0]
-
-    # Log inventory movement for source branch (transfer_out)
-    supabase.table("inventory_movements").insert(
-        {
-            "branch_id": body.from_branch_id,
-            "ingredient_id": body.ingredient_id,
-            "type": "transfer_out",
-            "quantity": body.quantity,
-            "reason": body.notes or "Inter-branch transfer",
-            "reference_id": transfer["id"],
-            "employee_id": body.initiated_by,
-            "unit_cost_snapshot": float(ingredient_result.data["unit_cost"]),
-        }
-    ).execute()
-
-    return transfer
 
 
 @router.get("/transfers", response_model=list[TransferResponse])
@@ -99,17 +109,27 @@ def list_transfers(
 ):
     """List transfers where branch is either source or destination."""
     supabase = get_supabase()
+    select = "*, ingredient:ingredients(name), initiator:profiles!initiated_by(full_name)"
     # Executive can see all
     if user.role == "executive":
-        query = supabase.table("transfers").select("*")
+        query = supabase.table("transfers").select(select)
     else:
         require_branch_access(user, branch_id)
-        query = supabase.table("transfers").select("*").or_(f"from_branch_id.eq.{branch_id},to_branch_id.eq.{branch_id}")
+        query = supabase.table("transfers").select(select).or_(f"from_branch_id.eq.{branch_id},to_branch_id.eq.{branch_id}")
 
     if status:
         query = query.eq("status", status)
     result = query.order("initiated_at", desc=True).limit(limit).execute()
-    return result.data
+    return [_flatten_transfer(row) for row in result.data]
+
+
+def _flatten_transfer(row: dict) -> dict:
+    row = dict(row)
+    ingredient = row.pop("ingredient", None)
+    initiator = row.pop("initiator", None)
+    row["ingredient_name"] = ingredient["name"] if ingredient else None
+    row["initiated_by_name"] = initiator["full_name"] if initiator else None
+    return row
 
 
 @router.get("/transfers/{transfer_id}", response_model=TransferResponse)
@@ -133,7 +153,6 @@ def get_transfer(
 @router.post("/transfers/{transfer_id}/confirm", response_model=TransferResponse)
 def confirm_transfer(
     transfer_id: str,
-    body: TransferUpdate,
     user: CurrentUser = Depends(get_current_user),
 ):
     """Destination branch confirms receipt (TransIN)."""

@@ -1,5 +1,7 @@
 import bcrypt
 import io
+import re
+import secrets
 import zipfile
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from datetime import date, datetime, timezone
@@ -13,6 +15,8 @@ from app.schemas import (
     ClockInRequest,
     ClockOutRequest,
     AttendanceLogResponse,
+    EmployeeCreate,
+    EmployeeCreatedResponse,
     EmployeeResponse,
     EmployeeUpdate,
     PayrollRow,
@@ -23,6 +27,13 @@ from app.schemas import (
 )
 
 router = APIRouter(tags=["hr"])
+
+# Same defaults used across scripts/seed_demo.py and the kiosk - this system
+# hands out a shared demo password/PIN convention rather than one-off random
+# credentials, so a manager-created account behaves identically to a seeded one.
+_DEFAULT_PASSWORD = "demo1234"
+_DEFAULT_PIN = "1234"
+_DEFAULT_PIN_HASH = bcrypt.hashpw(_DEFAULT_PIN.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 @router.post("/attendance/clock-in", response_model=AttendanceLogResponse)
@@ -597,6 +608,94 @@ def get_employees(
         .execute()
     )
     return _attach_emails(result.data)
+
+
+def _slugify(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", ".", name.lower()).strip(".")
+    return slug or "employee"
+
+
+@router.post("/employees", response_model=EmployeeCreatedResponse)
+def create_employee(
+    body: EmployeeCreate,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Manager/executive creates a new employee or manager account for a
+    branch - reuses the same Supabase Auth admin-user-creation pattern as
+    scripts/seed_demo.py's upsert_user (get_supabase() is a service-role
+    client with .auth.admin access from a router the same as from a script).
+    """
+    if user.role not in ("manager", "executive"):
+        raise HTTPException(status_code=403, detail="Manager or Executive access required")
+    require_branch_access(user, body.branch_id)
+
+    supabase = get_supabase()
+
+    branch_result = (
+        supabase.table("branches").select("theme_key").eq("id", body.branch_id).maybe_single().execute()
+    )
+    if not branch_result or not branch_result.data:
+        raise HTTPException(status_code=404, detail="Branch not found")
+    theme_key = branch_result.data["theme_key"]
+
+    # Generate a unique login email, retrying with a numeric suffix if the
+    # branch already has an employee with the same name-derived slug.
+    slug = _slugify(body.full_name)
+    email = None
+    for attempt in range(10):
+        candidate = f"{slug}@{theme_key}.com" if attempt == 0 else f"{slug}{attempt + 1}@{theme_key}.com"
+        existing_user = next(
+            (u for u in supabase.auth.admin.list_users() if u.email == candidate), None
+        )
+        if not existing_user:
+            email = candidate
+            break
+    if email is None:
+        raise HTTPException(status_code=500, detail="Could not generate a unique login email")
+
+    created = supabase.auth.admin.create_user(
+        {"email": email, "password": _DEFAULT_PASSWORD, "email_confirm": True}
+    )
+    user_id = created.user.id
+
+    # Generate a unique employee_number, retrying on conflict.
+    employee_number = None
+    for _ in range(5):
+        candidate = f"EMP-{theme_key.upper()}-{secrets.token_hex(2).upper()}"
+        conflict = (
+            supabase.table("profiles").select("id").eq("employee_number", candidate).maybe_single().execute()
+        )
+        if not conflict or not conflict.data:
+            employee_number = candidate
+            break
+    if employee_number is None:
+        raise HTTPException(status_code=500, detail="Could not generate a unique employee number")
+
+    supabase.table("profiles").insert(
+        {
+            "id": user_id,
+            "branch_id": body.branch_id,
+            "role": body.role,
+            "full_name": body.full_name,
+            "employee_number": employee_number,
+            "kiosk_pin_hash": _DEFAULT_PIN_HASH,
+            "position": body.position,
+            "pay_rate": body.pay_rate or 0,
+        }
+    ).execute()
+
+    profile_result = (
+        supabase.table("profiles")
+        .select("id, full_name, role, branch_id, pay_rate, position, payroll_schedule")
+        .eq("id", user_id)
+        .single()
+        .execute()
+    )
+    profile = profile_result.data
+    profile["email"] = email
+    profile["default_password"] = _DEFAULT_PASSWORD
+    profile["default_pin"] = _DEFAULT_PIN
+    return profile
 
 
 @router.patch("/employees/{employee_id}", response_model=EmployeeResponse)

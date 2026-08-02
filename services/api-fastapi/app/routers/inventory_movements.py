@@ -40,6 +40,12 @@ def create_inventory_movement(
     unit_cost = float(ingredient_result.data["unit_cost"])
     current_stock = float(ingredient_result.data["current_stock"])
 
+    # Deliveries are the natural point where a branch's per-unit cost
+    # changes (new supplier pricing) - an explicit override updates the
+    # ingredient's stored unit_cost too, not just this movement's snapshot.
+    if body.type == "delivery" and body.unit_cost is not None:
+        unit_cost = body.unit_cost
+
     # Determine stock delta based on movement type
     delta = body.quantity
     if body.type in ("trans_out", "transfer_out"):
@@ -50,8 +56,11 @@ def create_inventory_movement(
     else:
         raise HTTPException(status_code=400, detail=f"Unknown movement type: {body.type}")
 
-    # Update ingredient stock
-    supabase.table("ingredients").update({"current_stock": new_stock}).eq(
+    # Update ingredient stock (and cost basis, if a delivery override was given)
+    update_fields = {"current_stock": new_stock}
+    if body.type == "delivery" and body.unit_cost is not None:
+        update_fields["unit_cost"] = body.unit_cost
+    supabase.table("ingredients").update(update_fields).eq(
         "id", body.ingredient_id
     ).execute()
 

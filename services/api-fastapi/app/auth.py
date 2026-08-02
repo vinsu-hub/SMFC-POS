@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -61,3 +62,26 @@ def require_branch_access(user: CurrentUser, branch_id: str) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized for this branch",
         )
+
+
+def verify_employee_pin(employee_number: str, pin: str) -> dict | None:
+    """Looks up a profile by kiosk employee_number and bcrypt-verifies pin
+    against kiosk_pin_hash. Same primitive as kiosk.py's /kiosk/verify, minus
+    that endpoint's kiosk-registration/attendance side effects - used where
+    only identity re-confirmation is needed (e.g. the POS Owner's Request
+    flow), not a full kiosk clock-in check-in.
+    """
+    supabase = get_supabase()
+    result = (
+        supabase.table("profiles")
+        .select("id, full_name, kiosk_pin_hash")
+        .eq("employee_number", employee_number)
+        .maybe_single()
+        .execute()
+    )
+    if not result or not result.data or not result.data.get("kiosk_pin_hash"):
+        return None
+    profile = result.data
+    if not bcrypt.checkpw(pin.encode("utf-8"), profile["kiosk_pin_hash"].encode("utf-8")):
+        return None
+    return profile

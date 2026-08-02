@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Loader2, Zap, Droplets, Calculator, Calendar, Clock, RefreshCw, Trash2 } from 'lucide-react';
+import { Plus, Loader2, Zap, Droplets, Flame, Calculator, Calendar, Clock, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 import { BRANCH_CONFIG } from '@/lib/types';
@@ -24,7 +24,10 @@ import {
 const UTILITY_TYPES: { value: UtilityType; label: string; icon: React.ReactNode; color: string }[] = [
   { value: 'electricity', label: 'Electricity', icon: <Zap className="w-4 h-4" />, color: 'bg-warning-bg text-warning' },
   { value: 'water', label: 'Water', icon: <Droplets className="w-4 h-4" />, color: 'bg-accent-soft text-accent-foreground' },
+  { value: 'gas', label: 'Gas', icon: <Flame className="w-4 h-4" />, color: 'bg-error-bg text-destructive' },
 ];
+
+const GAS_UNIT_OPTIONS = ['kg', 'tank', 'L'];
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -50,13 +53,18 @@ export default function UtilityLog() {
   });
   const [periodEnd, setPeriodEnd] = useState(() => new Date().toISOString().split('T')[0]);
 
-  const [form, setForm] = useState({
+  const emptyForm = () => ({
     utility_type: 'electricity' as UtilityType,
     business_date: new Date().toISOString().split('T')[0],
     reading_start: '',
     reading_end: '',
+    quantity: '',
+    unit_label: 'kg',
+    days_covered: '1',
     unit_cost: '',
   });
+
+  const [form, setForm] = useState(emptyForm());
 
   useEffect(() => {
     if (!user?.branchId) return;
@@ -82,13 +90,25 @@ export default function UtilityLog() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.business_date || !form.reading_start || !form.reading_end || !form.unit_cost) {
+    const isGas = form.utility_type === 'gas';
+    if (!form.business_date || !form.unit_cost) {
       toast.error('Please fill all fields');
       return;
     }
-    if (parseFloat(form.reading_end) < parseFloat(form.reading_start)) {
-      toast.error('End reading cannot be less than start reading');
-      return;
+    if (isGas) {
+      if (!form.quantity || !form.unit_label || !form.days_covered) {
+        toast.error('Please fill quantity, unit, and days covered');
+        return;
+      }
+    } else {
+      if (!form.reading_start || !form.reading_end) {
+        toast.error('Please fill all fields');
+        return;
+      }
+      if (parseFloat(form.reading_end) < parseFloat(form.reading_start)) {
+        toast.error('End reading cannot be less than start reading');
+        return;
+      }
     }
     setSubmitting(true);
     try {
@@ -96,19 +116,16 @@ export default function UtilityLog() {
         branch_id: user.branchId!,
         utility_type: form.utility_type,
         business_date: form.business_date,
-        reading_start: parseFloat(form.reading_start),
-        reading_end: parseFloat(form.reading_end),
+        reading_start: isGas ? undefined : parseFloat(form.reading_start),
+        reading_end: isGas ? undefined : parseFloat(form.reading_end),
+        quantity: isGas ? parseFloat(form.quantity) : undefined,
+        unit_label: isGas ? form.unit_label : undefined,
+        days_covered: isGas ? parseInt(form.days_covered, 10) : undefined,
         unit_cost: parseFloat(form.unit_cost),
         recorded_by: user.id,
       });
       toast.success('Utility reading recorded');
-      setForm({
-        utility_type: 'electricity',
-        business_date: new Date().toISOString().split('T')[0],
-        reading_start: '',
-        reading_end: '',
-        unit_cost: '',
-      });
+      setForm(emptyForm());
       setDialogOpen(false);
       setEditingLog(null);
       loadData();
@@ -124,8 +141,11 @@ export default function UtilityLog() {
     setForm({
       utility_type: log.utility_type,
       business_date: log.business_date,
-      reading_start: String(log.reading_start),
-      reading_end: String(log.reading_end ?? ''),
+      reading_start: log.reading_start !== null ? String(log.reading_start) : '',
+      reading_end: log.reading_end !== null ? String(log.reading_end) : '',
+      quantity: log.quantity !== null ? String(log.quantity) : '',
+      unit_label: log.unit_label ?? 'kg',
+      days_covered: log.days_covered !== null ? String(log.days_covered) : '1',
       unit_cost: String(log.unit_cost),
     });
     setSelectedType(log.utility_type);
@@ -145,13 +165,7 @@ export default function UtilityLog() {
   const handleOpenDialog = (type: UtilityType) => {
     setSelectedType(type);
     setEditingLog(null);
-    setForm({
-      utility_type: type,
-      business_date: new Date().toISOString().split('T')[0],
-      reading_start: '',
-      reading_end: '',
-      unit_cost: '',
-    });
+    setForm({ ...emptyForm(), utility_type: type });
     setDialogOpen(true);
   };
 
@@ -194,7 +208,7 @@ export default function UtilityLog() {
 
         {/* Summary Cards */}
         {summary && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card className="border-l-4" style={{ borderLeftColor: '#C98A2C' }}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -224,6 +238,18 @@ export default function UtilityLog() {
                 <div className="mt-4 pt-4 border-t">
                   <p className="text-sm text-muted-foreground font-corp-body">Cost</p>
                   <p className="text-2xl font-corp-mono font-bold text-foreground">{formatCurrency(summary.water.cost)}</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4" style={{ borderLeftColor: '#C1440E' }}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground font-corp-body">Gas Cost</p>
+                    <p className="text-3xl font-corp-mono font-bold text-destructive">{formatCurrency(summary.gas?.cost ?? 0)}</p>
+                    <p className="text-sm text-muted-foreground font-corp-body mt-1">{summary.gas?.readings_count ?? 0} logs</p>
+                  </div>
+                  <Flame className="w-12 h-12 text-destructive/30" />
                 </div>
               </CardContent>
             </Card>
@@ -298,44 +324,103 @@ export default function UtilityLog() {
                   className="font-corp-body"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground font-corp-body">Start Reading</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={form.reading_start}
-                    onChange={e => setForm({ ...form, reading_start: e.target.value })}
-                    placeholder="Start"
-                    className="font-corp-body font-corp-mono"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground font-corp-body">End Reading</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={form.reading_end}
-                    onChange={e => setForm({ ...form, reading_end: e.target.value })}
-                    placeholder="End"
-                    className="font-corp-body font-corp-mono"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground font-corp-body">Unit Cost (per kWh/m³)</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.unit_cost}
-                  onChange={e => setForm({ ...form, unit_cost: e.target.value })}
-                  placeholder="e.g. 12.50"
-                  className="font-corp-body font-corp-mono"
-                />
-              </div>
+              {form.utility_type === 'gas' ? (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground font-corp-body">Quantity Consumed</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={form.quantity}
+                        onChange={e => setForm({ ...form, quantity: e.target.value })}
+                        placeholder="e.g. 11"
+                        className="font-corp-body font-corp-mono"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground font-corp-body">Unit</label>
+                      <Select value={form.unit_label} onValueChange={v => setForm({ ...form, unit_label: v })}>
+                        <SelectTrigger className="font-corp-body">
+                          <SelectValue placeholder="Unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {GAS_UNIT_OPTIONS.map((u) => (
+                            <SelectItem key={u} value={u}>{u}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground font-corp-body">Days Covered</label>
+                    <Select value={form.days_covered} onValueChange={v => setForm({ ...form, days_covered: v })}>
+                      <SelectTrigger className="font-corp-body">
+                        <SelectValue placeholder="Days" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+                          <SelectItem key={d} value={String(d)}>{d} day{d > 1 ? 's' : ''}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground font-corp-body">Unit Cost (per {form.unit_label || 'unit'})</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={form.unit_cost}
+                      onChange={e => setForm({ ...form, unit_cost: e.target.value })}
+                      placeholder="e.g. 950"
+                      className="font-corp-body font-corp-mono"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground font-corp-body">Start Reading</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={form.reading_start}
+                        onChange={e => setForm({ ...form, reading_start: e.target.value })}
+                        placeholder="Start"
+                        className="font-corp-body font-corp-mono"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground font-corp-body">End Reading</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={form.reading_end}
+                        onChange={e => setForm({ ...form, reading_end: e.target.value })}
+                        placeholder="End"
+                        className="font-corp-body font-corp-mono"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground font-corp-body">Unit Cost (per kWh/m³)</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={form.unit_cost}
+                      onChange={e => setForm({ ...form, unit_cost: e.target.value })}
+                      placeholder="e.g. 12.50"
+                      className="font-corp-body font-corp-mono"
+                    />
+                  </div>
+                </>
+              )}
               <div className="flex gap-3 pt-4">
                 <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); setEditingLog(null); }} className="flex-1">
                   Cancel
@@ -370,7 +455,7 @@ export default function UtilityLog() {
                       <TableHead className="w-40">Date</TableHead>
                       <TableHead className="text-right w-28">Start</TableHead>
                       <TableHead className="text-right w-28">End</TableHead>
-                      <TableHead className="text-right w-28">Consumption</TableHead>
+                      <TableHead className="text-right w-32">Consumption / Qty-Days</TableHead>
                       <TableHead className="text-right w-28">Unit Cost</TableHead>
                       <TableHead className="text-right w-32">Cost</TableHead>
                       <TableHead className="w-48">Recorded</TableHead>
@@ -379,8 +464,11 @@ export default function UtilityLog() {
                   </TableHeader>
                   <TableBody>
                     {logs.map((log) => {
-                      const consumption = log.reading_end !== null ? log.reading_end - log.reading_start : null;
-                      const cost = consumption !== null ? consumption * log.unit_cost : null;
+                      const isGas = log.utility_type === 'gas';
+                      const consumption = log.reading_end !== null && log.reading_start !== null ? log.reading_end - log.reading_start : null;
+                      const cost = isGas
+                        ? (log.quantity ?? 0) * log.unit_cost
+                        : consumption !== null ? consumption * log.unit_cost : null;
                       const type = getUtilityType(log.utility_type);
                       return (
                         <TableRow key={log.id} className="font-corp-body">
@@ -393,10 +481,12 @@ export default function UtilityLog() {
                             </Badge>
                           </TableCell>
                           <TableCell className="font-corp-mono">{formatDate(log.business_date)}</TableCell>
-                          <TableCell className="text-right font-corp-mono">{log.reading_start.toLocaleString()}</TableCell>
-                          <TableCell className="text-right font-corp-mono">{log.reading_end !== null ? log.reading_end.toLocaleString() : <span className="text-muted-foreground">—</span>}</TableCell>
+                          <TableCell className="text-right font-corp-mono">{isGas || log.reading_start === null ? <span className="text-muted-foreground">—</span> : log.reading_start.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-corp-mono">{!isGas && log.reading_end !== null ? log.reading_end.toLocaleString() : <span className="text-muted-foreground">—</span>}</TableCell>
                           <TableCell className="text-right font-corp-mono font-medium">
-                            {consumption !== null ? consumption.toLocaleString() : <span className="text-muted-foreground">—</span>}
+                            {isGas
+                              ? `${log.quantity ?? '—'} ${log.unit_label ?? ''} / ${log.days_covered ?? '—'}d`
+                              : consumption !== null ? consumption.toLocaleString() : <span className="text-muted-foreground">—</span>}
                           </TableCell>
                           <TableCell className="text-right font-corp-mono">{formatCurrency(log.unit_cost)}</TableCell>
                           <TableCell className="text-right font-corp-mono font-medium text-success">

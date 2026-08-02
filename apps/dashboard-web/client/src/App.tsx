@@ -10,6 +10,8 @@ import { SyncProvider } from "./contexts/SyncContext";
 import Login from "./pages/Login";
 import Home from "./pages/Home";
 import POSTerminal from "./pages/POSTerminal";
+import OrderQueue from "./pages/OrderQueue";
+import POSManagement from "./pages/POSManagement";
 import ManagerDashboard from "./pages/ManagerDashboard";
 import CommandCenter from "./pages/CommandCenter";
 import TrendAnalysis from "./pages/TrendAnalysis";
@@ -31,6 +33,8 @@ function Router() {
       <Route path={"/login"} component={Login} />
       <Route path={"/"} component={Home} />
       <Route path={"/pos"} component={POSTerminal} />
+      <Route path={"/order-queue"} component={OrderQueue} />
+      <Route path={"/pos-management"} component={POSManagement} />
       <Route path={"/dashboard"} component={ManagerDashboard} />
       <Route path={"/command-center"} component={CommandCenter} />
       <Route path={"/trends"} component={TrendAnalysis} />

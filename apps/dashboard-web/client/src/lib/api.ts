@@ -24,7 +24,62 @@ export interface ApiTransaction {
   opened_at: string;
   closed_at: string | null;
   total_amount: number;
-  items: { id: string; product_id: string; quantity: number; unit_price: number }[];
+  discount_type_id: string | null;
+  discount_amount: number;
+  tax_amount: number;
+  is_owner_request: boolean;
+  owner_request_by: string | null;
+  owner_request_note: string | null;
+  voided_by: string | null;
+  voided_at: string | null;
+  void_reason: string | null;
+  fulfilled: boolean;
+  fulfilled_at: string | null;
+  items: { id: string; product_id: string; quantity: number; unit_price: number; held_ingredient_ids: string[] }[];
+}
+
+export interface UpdateTransactionItemRequest {
+  quantity?: number;
+  held_ingredient_ids?: string[];
+}
+
+export interface ApiRecipeItem {
+  ingredient_id: string;
+  quantity: number;
+  ingredients: { id: string; name: string; unit: string };
+}
+
+export interface CreateTransactionOptions {
+  discount_type_id?: string | null;
+  is_owner_request?: boolean;
+  owner_request_employee_number?: string;
+  owner_request_pin?: string;
+  owner_request_note?: string;
+}
+
+export interface ApiDiscountType {
+  id: string;
+  branch_id: string;
+  name: string;
+  percentage: number;
+  vat_exempt: boolean;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateDiscountTypeRequest {
+  branch_id: string;
+  name: string;
+  percentage: number;
+  vat_exempt?: boolean;
+}
+
+export interface UpdateDiscountTypeRequest {
+  name?: string;
+  percentage?: number;
+  vat_exempt?: boolean;
+  active?: boolean;
 }
 
 export interface ApiIngredient {
@@ -87,6 +142,14 @@ export interface CreateInventoryMovementRequest {
   reason?: string | null;
   reference_id?: string | null;
   employee_id: string;
+  unit_cost?: number | null;
+}
+
+// --- Branches ---
+export interface ApiBranch {
+  id: string;
+  name: string;
+  theme_key: string;
 }
 
 // --- Transfers ---
@@ -95,9 +158,11 @@ export interface ApiTransfer {
   from_branch_id: string;
   to_branch_id: string;
   ingredient_id: string;
+  ingredient_name: string | null;
   quantity: number;
   status: 'pending' | 'confirmed' | 'rejected' | 'cancelled';
   initiated_by: string;
+  initiated_by_name: string | null;
   confirmed_by: string | null;
   initiated_at: string;
   confirmed_at: string | null;
@@ -114,15 +179,18 @@ export interface CreateTransferRequest {
 }
 
 // --- Utility ---
-export type UtilityType = 'electricity' | 'water';
+export type UtilityType = 'electricity' | 'water' | 'gas';
 
 export interface ApiUtilityLog {
   id: string;
   branch_id: string;
   utility_type: UtilityType;
   business_date: string;
-  reading_start: number;
+  reading_start: number | null;
   reading_end: number | null;
+  quantity: number | null;
+  unit_label: string | null;
+  days_covered: number | null;
   unit_cost: number;
   recorded_by: string;
   created_at: string;
@@ -133,8 +201,11 @@ export interface CreateUtilityLogRequest {
   branch_id: string;
   utility_type: UtilityType;
   business_date: string;
-  reading_start: number;
+  reading_start?: number | null;
   reading_end?: number | null;
+  quantity?: number | null;
+  unit_label?: string | null;
+  days_covered?: number | null;
   unit_cost: number;
   recorded_by: string;
 }
@@ -154,7 +225,40 @@ export interface ApiUtilitySummary {
     cost: number;
     readings_count: number;
   };
+  gas: {
+    consumption: number;
+    cost: number;
+    readings_count: number;
+  };
   total_cost: number;
+}
+
+// --- Stock Requests ---
+export type StockRequestStatus = 'pending' | 'fulfilled' | 'declined' | 'cancelled';
+
+export interface ApiStockRequest {
+  id: string;
+  requesting_branch_id: string;
+  source_branch_id: string;
+  ingredient_id: string;
+  ingredient_name: string | null;
+  quantity: number;
+  status: StockRequestStatus;
+  requested_by: string;
+  requested_by_name: string | null;
+  notes: string | null;
+  transfer_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateStockRequestRequest {
+  requesting_branch_id: string;
+  source_branch_id: string;
+  ingredient_id: string;
+  quantity: number;
+  requested_by: string;
+  notes?: string | null;
 }
 
 // --- HR / Attendance / Payroll ---
@@ -189,6 +293,19 @@ export interface ApiEmployee {
   pay_rate: number;
   position: string | null;
   payroll_schedule: string;
+}
+
+export interface CreateEmployeeRequest {
+  branch_id: string;
+  full_name: string;
+  role: 'employee' | 'manager';
+  position?: string | null;
+  pay_rate?: number | null;
+}
+
+export interface ApiEmployeeCreated extends ApiEmployee {
+  default_password: string;
+  default_pin: string;
 }
 
 export interface UpdateEmployeeRequest {
@@ -308,16 +425,70 @@ export function fetchProducts(branchId: string): Promise<ApiProduct[]> {
 export function createTransaction(
   branchId: string,
   employeeId: string,
-  items: CreateTransactionItem[]
+  items: CreateTransactionItem[],
+  options?: CreateTransactionOptions
 ): Promise<ApiTransaction> {
   return request('/transactions', {
     method: 'POST',
-    body: JSON.stringify({ branch_id: branchId, employee_id: employeeId, items }),
+    body: JSON.stringify({ branch_id: branchId, employee_id: employeeId, items, ...options }),
   });
 }
 
 export function closeTransaction(transactionId: string): Promise<ApiTransaction> {
   return request(`/transactions/${transactionId}/close`, { method: 'POST' });
+}
+
+export function fetchTransactions(branchId: string, date?: string): Promise<ApiTransaction[]> {
+  const params = new URLSearchParams({ branch_id: branchId });
+  if (date) params.append('date', date);
+  return request(`/transactions?${params.toString()}`);
+}
+
+export function voidTransaction(transactionId: string, reason?: string): Promise<ApiTransaction> {
+  return request(`/transactions/${transactionId}/void`, {
+    method: 'POST',
+    body: JSON.stringify({ reason: reason || null }),
+  });
+}
+
+export function fulfillTransaction(transactionId: string): Promise<ApiTransaction> {
+  return request(`/transactions/${transactionId}/fulfill`, { method: 'POST' });
+}
+
+export function updateTransactionItem(
+  transactionId: string,
+  itemId: string,
+  body: UpdateTransactionItemRequest
+): Promise<ApiTransaction> {
+  return request(`/transactions/${transactionId}/items/${itemId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export function fetchRecipe(productId: string): Promise<ApiRecipeItem[]> {
+  return request(`/products/${productId}/recipe`);
+}
+
+// --- Discounts ---
+export function fetchDiscountTypes(branchId: string, activeOnly = false): Promise<ApiDiscountType[]> {
+  const params = new URLSearchParams({ branch_id: branchId });
+  if (activeOnly) params.append('active_only', 'true');
+  return request(`/discount-types?${params.toString()}`);
+}
+
+export function createDiscountType(body: CreateDiscountTypeRequest): Promise<ApiDiscountType> {
+  return request('/discount-types', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateDiscountType(id: string, body: UpdateDiscountTypeRequest): Promise<ApiDiscountType> {
+  return request(`/discount-types/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
 }
 
 export function fetchInventory(branchId: string): Promise<ApiIngredient[]> {
@@ -382,6 +553,11 @@ export function queryMalaya(question: string): Promise<ApiMalayaResponse> {
   });
 }
 
+// --- Branches ---
+export function fetchBranches(): Promise<ApiBranch[]> {
+  return request('/branches');
+}
+
 // --- Inventory Movements ---
 export function fetchInventoryMovements(
   branchId: string,
@@ -432,6 +608,31 @@ export function confirmTransfer(transferId: string): Promise<ApiTransfer> {
 
 export function rejectTransfer(transferId: string): Promise<ApiTransfer> {
   return request(`/transfers/${transferId}/reject`, { method: 'POST' });
+}
+
+// --- Stock Requests ---
+export function fetchStockRequests(
+  branchId: string,
+  status?: StockRequestStatus
+): Promise<ApiStockRequest[]> {
+  const params = new URLSearchParams({ branch_id: branchId });
+  if (status) params.append('status', status);
+  return request(`/stock-requests?${params.toString()}`);
+}
+
+export function createStockRequest(body: CreateStockRequestRequest): Promise<ApiStockRequest> {
+  return request('/stock-requests', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function fulfillStockRequest(requestId: string): Promise<ApiStockRequest> {
+  return request(`/stock-requests/${requestId}/fulfill`, { method: 'POST' });
+}
+
+export function declineStockRequest(requestId: string): Promise<ApiStockRequest> {
+  return request(`/stock-requests/${requestId}/decline`, { method: 'POST' });
 }
 
 // --- Utility ---
@@ -555,6 +756,13 @@ export function fetchPayrollReceiptsZip(
 
 export function fetchEmployees(branchId: string): Promise<ApiEmployee[]> {
   return request(`/employees?branch_id=${branchId}`);
+}
+
+export function createEmployee(body: CreateEmployeeRequest): Promise<ApiEmployeeCreated> {
+  return request('/employees', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 }
 
 export function updateEmployee(employeeId: string, body: UpdateEmployeeRequest): Promise<ApiEmployee> {

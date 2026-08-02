@@ -23,6 +23,8 @@ import {
   Truck,
   Send,
   RefreshCw,
+  ListOrdered,
+  Percent,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -40,7 +42,7 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
 
   const branchConfig = user.branch
     ? BRANCH_CONFIG[user.branch]
-    : { name: 'Corporate HQ', color: '#1B2A4A' };
+    : { name: 'Corporate HQ', color: '#1B2A4A', logoUrl: undefined as string | undefined };
 
   const isEmployee = user.role === 'employee';
   const isManager = user.role === 'manager';
@@ -51,6 +53,7 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
     ...(isEmployee
       ? [
           { icon: ShoppingCart, label: 'POS Terminal', href: '/pos', show: true },
+          { icon: ListOrdered, label: 'Order Queue', href: '/order-queue', show: true },
           { icon: Package, label: 'Count Stock', href: '/inventory-count', show: true },
           { icon: AlertCircle, label: 'Log Loss', href: '/loss-log', show: true },
           { icon: Truck, label: 'Inventory Movements', href: '/inventory-movements', show: true },
@@ -61,6 +64,8 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
     ...(isManager
       ? [
           { icon: BarChart3, label: 'EOD Dashboard', href: '/dashboard', show: true },
+          { icon: ListOrdered, label: 'Order Queue', href: '/order-queue', show: true },
+          { icon: Percent, label: 'POS Management', href: '/pos-management', show: true },
           { icon: Package, label: 'Inventory Count', href: '/inventory-count', show: true },
           { icon: AlertCircle, label: 'Loss Log', href: '/loss-log', show: true },
           { icon: Truck, label: 'Inventory Movements', href: '/inventory-movements', show: true },
@@ -73,6 +78,7 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
     ...(isExecutive
       ? [
           { icon: BarChart3, label: 'Command Center', href: '/command-center', show: true },
+          { icon: Percent, label: 'POS Management', href: '/pos-management', show: true },
           { icon: TrendingUp, label: 'Trend Analysis', href: '/trends', show: true },
           { icon: Sparkles, label: 'Malaya AI', href: '/malaya', show: true },
           { icon: Users, label: 'HR Management', href: '/hr/attendance', show: true },
@@ -88,14 +94,17 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
       <>
         <div className={`p-4 border-b border-border flex items-center gap-3 ${isCollapsed ? 'justify-center px-2' : ''}`}>
           <div
-            className="w-10 h-10 shrink-0 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-l2-raised"
-            style={{ backgroundColor: branchConfig.color }}
+            className="w-10 h-10 shrink-0 rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-l2-raised overflow-hidden bg-white"
+            style={{ backgroundColor: branchConfig.logoUrl ? '#fff' : branchConfig.color }}
             title={isCollapsed ? branchConfig.name : undefined}
           >
-            {user.branch === 'danielito' && 'D'}
-            {user.branch === 'malaya' && 'M'}
-            {user.branch === 'dden' && 'D'}
-            {!user.branch && 'HQ'}
+            {branchConfig.logoUrl ? (
+              <img src={branchConfig.logoUrl} alt={branchConfig.name} className="w-full h-full object-contain p-1" />
+            ) : !user.branch ? (
+              'HQ'
+            ) : (
+              branchConfig.name.charAt(0).toUpperCase()
+            )}
           </div>
           {!isCollapsed && (
             <div className="min-w-0">

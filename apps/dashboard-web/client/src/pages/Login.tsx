@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { COMPANY_THEME, LOCATIONS, type CompanyKey } from '@/lib/types';
+import saintMichaelLogo from '@/assets/logos/saintmichael.png';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -41,38 +43,23 @@ export default function Login() {
     }
   };
 
-  const demoAccounts = [
-    {
-      branch: 'danielito',
-      branchName: "Danielito's Home Kitchen",
-      color: '#1F2E28',
-      accounts: [
-        { name: 'Employee - Marco', email: 'marco@danielito.com', role: 'employee' },
-        { name: 'Employee - Rosa', email: 'rosa@danielito.com', role: 'employee' },
-        { name: 'Manager - Chef Luis', email: 'luis@danielito.com', role: 'manager' },
-      ],
-    },
-    {
-      branch: 'malaya',
-      branchName: "Malaya's Cafe",
-      color: '#6E8368',
-      accounts: [
-        { name: 'Employee - Ana', email: 'ana@malaya.com', role: 'employee' },
-        { name: 'Employee - Javier', email: 'javier@malaya.com', role: 'employee' },
-        { name: 'Manager - Sofia', email: 'sofia@malaya.com', role: 'manager' },
-      ],
-    },
-    {
-      branch: 'dden',
-      branchName: "D'Den",
-      color: '#8B4513',
-      accounts: [
-        { name: 'Employee - Diego', email: 'diego@dden.com', role: 'employee' },
-        { name: 'Employee - Carmen', email: 'carmen@dden.com', role: 'employee' },
-        { name: 'Manager - Victor', email: 'victor@dden.com', role: 'manager' },
-      ],
-    },
-  ];
+  // Grouped by company (5 companies), each listing its locations' 1
+  // employee + 1 manager login - mirrors scripts/seed_demo.py's account
+  // generation exactly, so these credentials always match what's seeded.
+  const companyKeys = Array.from(new Set(LOCATIONS.map((l) => l.companyKey))) as CompanyKey[];
+  const demoAccounts = companyKeys.map((companyKey) => {
+    const company = COMPANY_THEME[companyKey];
+    const locations = LOCATIONS.filter((l) => l.companyKey === companyKey);
+    return {
+      branch: companyKey,
+      branchName: company.name,
+      color: company.color,
+      accounts: locations.flatMap((loc) => [
+        { name: `Employee - ${loc.locationLabel}`, email: `employee@${loc.themeKey}.com`, role: 'employee' },
+        { name: `Manager - ${loc.locationLabel}`, email: `manager@${loc.themeKey}.com`, role: 'manager' },
+      ]),
+    };
+  });
 
   const executiveAccounts = [
     { name: 'Executive - Corporate', email: 'exec@corp.com', role: 'executive' },
@@ -89,12 +76,12 @@ export default function Login() {
       <Card className="w-full max-w-2xl shadow-l3-modal">
         <CardHeader className="space-y-2 text-center">
           <div className="flex justify-center mb-4">
-            <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center text-white font-bold text-lg shadow-l2-raised">
-              SM
+            <div className="w-12 h-12 rounded-lg bg-white flex items-center justify-center shadow-l2-raised overflow-hidden">
+              <img src={saintMichaelLogo} alt="Saint Michael Food OPC" className="w-full h-full object-contain p-1" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-corp-display">Saint Michael</CardTitle>
-          <CardDescription>Food Corp • Multi-Venue POS System</CardDescription>
+          <CardTitle className="text-2xl font-corp-display">Saint Michael Food OPC</CardTitle>
+          <CardDescription>SMFC Command Suite</CardDescription>
         </CardHeader>
 
         <CardContent>

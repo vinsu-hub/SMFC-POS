@@ -303,14 +303,39 @@
     font-weight: 600;
   }
 
-  /* SMFC Catering typography */
-  .font-catering-display {
+  /* D'Venue Events Place typography */
+  .font-dvenue-display {
+    font-family: 'Cormorant Garamond', serif;
+    font-weight: 600;
+  }
+
+  .font-dvenue-body {
+    font-family: 'Nunito Sans', sans-serif;
+  }
+
+  /* Isabela's Signature Caterer typography */
+  .font-isabelas-display {
     font-family: 'Playfair Display', serif;
     font-weight: 600;
   }
 
-  .font-catering-body {
+  .font-isabelas-body {
     font-family: 'DM Sans', sans-serif;
     font-weight: 500;
+  }
+}
+
+@layer utilities {
+  /* Fluid stat text - scales with viewport width instead of jumping at
+     fixed breakpoints, so large numbers (elapsed time, currency) don't
+     overflow their card on narrow screens. */
+  .text-stat-lg {
+    font-size: clamp(1.5rem, 1.1rem + 1.8vw, 2.5rem);
+    line-height: 1.1;
+  }
+
+  .text-stat-md {
+    font-size: clamp(1.25rem, 1rem + 1.1vw, 1.875rem);
+    line-height: 1.15;
   }
 }

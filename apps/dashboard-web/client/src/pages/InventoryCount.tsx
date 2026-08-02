@@ -10,6 +10,7 @@ import { AlertCircle, CheckCircle, Loader2, Package } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 import { ApiIngredient, fetchInventory, submitInventoryCount } from '@/lib/api';
+import { BRANCH_CONFIG } from '@/lib/types';
 
 type ItemStatus = 'pending' | 'counted' | 'variance';
 
@@ -146,11 +147,10 @@ export default function InventoryCount() {
         </div>
 
         {/* Inventory Table */}
-        <Card className={`border-l-4 ${
-          user?.branch === 'danielito' ? 'border-l-[#1F2E28]' :
-          user?.branch === 'malaya' ? 'border-l-[#6E8368]' :
-          'border-l-[#B5651D]'
-        }`}>
+        <Card
+          className="border-l-4"
+          style={{ borderLeftColor: user?.branch ? BRANCH_CONFIG[user.branch].color : '#B5651D' }}
+        >
           <CardHeader>
             <CardTitle className="font-corp-display">Stock Count</CardTitle>
           </CardHeader>

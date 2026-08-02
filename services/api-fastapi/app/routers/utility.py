@@ -24,6 +24,18 @@ def _compute_totals(logs_list: list[dict]) -> tuple[float, float]:
     return total_consumption, total_cost
 
 
+def _compute_gas_totals(logs_list: list[dict]) -> tuple[float, float]:
+    """Gas has no meter start/end - consumption is the logged quantity
+    (a tank/kg amount) directly, summed across all matching logs."""
+    total_quantity = 0.0
+    total_cost = 0.0
+    for l in logs_list:
+        if l["quantity"] is not None:
+            total_quantity += float(l["quantity"])
+            total_cost += float(l["quantity"]) * float(l["unit_cost"])
+    return total_quantity, total_cost
+
+
 def _build_summary(
     branch_id: str,
     branch_name: str,
@@ -33,9 +45,11 @@ def _build_summary(
 ) -> dict:
     electricity_logs = [l for l in logs if l["utility_type"] == "electricity"]
     water_logs = [l for l in logs if l["utility_type"] == "water"]
+    gas_logs = [l for l in logs if l["utility_type"] == "gas"]
 
     elec_consumption, elec_cost = _compute_totals(electricity_logs)
     water_consumption, water_cost = _compute_totals(water_logs)
+    gas_quantity, gas_cost = _compute_gas_totals(gas_logs)
 
     return {
         "branch_id": branch_id,
@@ -52,7 +66,12 @@ def _build_summary(
             "cost": round(water_cost, 2),
             "readings_count": len([l for l in water_logs if l["reading_end"] is not None]),
         },
-        "total_cost": round(elec_cost + water_cost, 2),
+        "gas": {
+            "consumption": gas_quantity,
+            "cost": round(gas_cost, 2),
+            "readings_count": len(gas_logs),
+        },
+        "total_cost": round(elec_cost + water_cost + gas_cost, 2),
     }
 
 
@@ -67,23 +86,44 @@ def create_utility_log(
 
     supabase = get_supabase()
 
-    # Upsert: insert or update the record for this branch/utility/date
-    result = (
-        supabase.table("utility_logs")
-        .upsert(
-            {
-                "branch_id": body.branch_id,
-                "utility_type": body.utility_type,
-                "business_date": body.business_date.isoformat(),
-                "reading_start": body.reading_start,
-                "reading_end": body.reading_end,
-                "unit_cost": body.unit_cost,
-                "recorded_by": body.recorded_by,
-            },
-            on_conflict="branch_id,utility_type,business_date",
+    if body.utility_type == "gas":
+        # Gas logs have no unique-per-day constraint (a single entry can
+        # cover up to 7 days, and multiple entries may share a date) - each
+        # submission is its own row, not an upsert-by-date.
+        result = (
+            supabase.table("utility_logs")
+            .insert(
+                {
+                    "branch_id": body.branch_id,
+                    "utility_type": body.utility_type,
+                    "business_date": body.business_date.isoformat(),
+                    "quantity": body.quantity,
+                    "unit_label": body.unit_label,
+                    "days_covered": body.days_covered,
+                    "unit_cost": body.unit_cost,
+                    "recorded_by": body.recorded_by,
+                }
+            )
+            .execute()
         )
-        .execute()
-    )
+    else:
+        # Upsert: insert or update the record for this branch/utility/date
+        result = (
+            supabase.table("utility_logs")
+            .upsert(
+                {
+                    "branch_id": body.branch_id,
+                    "utility_type": body.utility_type,
+                    "business_date": body.business_date.isoformat(),
+                    "reading_start": body.reading_start,
+                    "reading_end": body.reading_end,
+                    "unit_cost": body.unit_cost,
+                    "recorded_by": body.recorded_by,
+                },
+                on_conflict="branch_id,utility_type,business_date",
+            )
+            .execute()
+        )
     return result.data[0]
 
 

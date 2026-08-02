@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class Product(BaseModel):
@@ -37,6 +37,11 @@ class CreateTransactionRequest(BaseModel):
     branch_id: str
     employee_id: str
     items: list[TransactionItemRequest]
+    discount_type_id: str | None = None
+    is_owner_request: bool = False
+    owner_request_employee_number: str | None = None
+    owner_request_pin: str | None = None
+    owner_request_note: str | None = None
 
 
 class TransactionItemResponse(BaseModel):
@@ -44,6 +49,12 @@ class TransactionItemResponse(BaseModel):
     product_id: str
     quantity: float
     unit_price: float
+    held_ingredient_ids: list[str] = []
+
+
+class UpdateTransactionItemRequest(BaseModel):
+    quantity: float | None = None
+    held_ingredient_ids: list[str] | None = None
 
 
 class TransactionResponse(BaseModel):
@@ -54,7 +65,49 @@ class TransactionResponse(BaseModel):
     opened_at: datetime
     closed_at: datetime | None = None
     total_amount: float
+    discount_type_id: str | None = None
+    discount_amount: float = 0
+    tax_amount: float = 0
+    is_owner_request: bool = False
+    owner_request_by: str | None = None
+    owner_request_note: str | None = None
+    voided_by: str | None = None
+    voided_at: datetime | None = None
+    void_reason: str | None = None
+    fulfilled: bool = False
+    fulfilled_at: datetime | None = None
     items: list[TransactionItemResponse]
+
+
+class VoidTransactionRequest(BaseModel):
+    reason: str | None = None
+
+
+# --- Discounts ---
+
+class DiscountType(BaseModel):
+    id: str
+    branch_id: str
+    name: str
+    percentage: float
+    vat_exempt: bool
+    active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class DiscountTypeCreate(BaseModel):
+    branch_id: str
+    name: str
+    percentage: float = Field(ge=0, le=100)
+    vat_exempt: bool = False
+
+
+class DiscountTypeUpdate(BaseModel):
+    name: str | None = None
+    percentage: float | None = Field(default=None, ge=0, le=100)
+    vat_exempt: bool | None = None
+    active: bool | None = None
 
 
 LossReason = Literal["spoilage", "breakage", "comp", "prep_error"]
@@ -96,6 +149,7 @@ class InventoryMovementCreate(BaseModel):
     reason: str | None = None
     reference_id: str | None = None
     employee_id: str
+    unit_cost: float | None = None  # delivery: overrides ingredient's stored unit_cost
 
 
 class InventoryMovementResponse(BaseModel):
@@ -127,9 +181,11 @@ class TransferResponse(BaseModel):
     from_branch_id: str
     to_branch_id: str
     ingredient_id: str
+    ingredient_name: str | None = None
     quantity: float
     status: str
     initiated_by: str
+    initiated_by_name: str | None = None
     confirmed_by: str | None = None
     initiated_at: datetime
     confirmed_at: datetime | None = None
@@ -140,19 +196,69 @@ class TransferUpdate(BaseModel):
     status: Literal["confirmed", "rejected", "cancelled"]
 
 
+# --- Branches ---
+
+class BranchResponse(BaseModel):
+    id: str
+    name: str
+    theme_key: str
+
+
+# --- Stock Requests ---
+
+StockRequestStatus = Literal["pending", "fulfilled", "declined", "cancelled"]
+
+
+class StockRequestCreate(BaseModel):
+    requesting_branch_id: str
+    source_branch_id: str
+    ingredient_id: str
+    quantity: float
+    requested_by: str
+    notes: str | None = None
+
+
+class StockRequestResponse(BaseModel):
+    id: str
+    requesting_branch_id: str
+    source_branch_id: str
+    ingredient_id: str
+    ingredient_name: str | None = None
+    quantity: float
+    status: StockRequestStatus
+    requested_by: str
+    requested_by_name: str | None = None
+    notes: str | None = None
+    transfer_id: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
 # --- Utility ---
 
-UtilityType = Literal["electricity", "water"]
+UtilityType = Literal["electricity", "water", "gas"]
 
 
 class UtilityLogCreate(BaseModel):
     branch_id: str
     utility_type: UtilityType
     business_date: date
-    reading_start: float
+    reading_start: float | None = None
     reading_end: float | None = None
+    quantity: float | None = None
+    unit_label: str | None = None
+    days_covered: int | None = Field(None, ge=1, le=7)
     unit_cost: float
     recorded_by: str
+
+    @model_validator(mode="after")
+    def _validate_type_fields(self):
+        if self.utility_type == "gas":
+            if self.quantity is None or self.days_covered is None:
+                raise ValueError("gas logs require quantity and days_covered")
+        elif self.reading_start is None:
+            raise ValueError(f"{self.utility_type} logs require reading_start")
+        return self
 
 
 class UtilityLogResponse(BaseModel):
@@ -160,8 +266,11 @@ class UtilityLogResponse(BaseModel):
     branch_id: str
     utility_type: UtilityType
     business_date: date
-    reading_start: float
+    reading_start: float | None = None
     reading_end: float | None = None
+    quantity: float | None = None
+    unit_label: str | None = None
+    days_covered: int | None = None
     unit_cost: float
     recorded_by: str
     created_at: datetime
@@ -175,6 +284,7 @@ class UtilitySummary(BaseModel):
     period_end: str | None = None
     electricity: dict
     water: dict
+    gas: dict
     total_cost: float
 
 
@@ -226,6 +336,20 @@ class EmployeeUpdate(BaseModel):
     pay_rate: float | None = None
     position: str | None = None
     payroll_schedule: str | None = None
+
+
+class EmployeeCreate(BaseModel):
+    branch_id: str
+    full_name: str
+    role: Literal["employee", "manager"]
+    position: str | None = None
+    pay_rate: float | None = None
+
+
+class EmployeeCreatedResponse(EmployeeResponse):
+    email: str
+    default_password: str
+    default_pin: str
 
 
 class PayrollRow(BaseModel):

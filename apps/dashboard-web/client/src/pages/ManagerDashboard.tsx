@@ -96,11 +96,7 @@ export default function ManagerDashboard() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Sales by Product */}
-          <Card className={`lg:col-span-2 border-l-4 ${
-            user.branch === 'danielito' ? 'border-l-[#1F2E28]' :
-            user.branch === 'malaya' ? 'border-l-[#6E8368]' :
-            'border-l-[#B5651D]'
-          }`}>
+          <Card className="lg:col-span-2 border-l-4" style={{ borderLeftColor: branchConfig.color }}>
             <CardHeader>
               <CardTitle className="font-corp-display">Sales by Product</CardTitle>
             </CardHeader>
@@ -129,11 +125,7 @@ export default function ManagerDashboard() {
           </Card>
 
           {/* Loss Log */}
-          <Card className={`border-l-4 ${
-            user.branch === 'danielito' ? 'border-l-[#1F2E28]' :
-            user.branch === 'malaya' ? 'border-l-[#6E8368]' :
-            'border-l-[#B5651D]'
-          }`}>
+          <Card className="border-l-4" style={{ borderLeftColor: branchConfig.color }}>
             <CardHeader>
               <CardTitle className="font-corp-display text-lg">Loss Log</CardTitle>
             </CardHeader>
@@ -152,11 +144,7 @@ export default function ManagerDashboard() {
         </div>
 
         {/* Attendance */}
-        <Card className={`border-l-4 ${
-          user.branch === 'danielito' ? 'border-l-[#1F2E28]' :
-          user.branch === 'malaya' ? 'border-l-[#6E8368]' :
-          'border-l-[#B5651D]'
-        }`}>
+        <Card className="border-l-4" style={{ borderLeftColor: branchConfig.color }}>
           <CardHeader>
             <CardTitle className="font-corp-display">Staff Attendance</CardTitle>
           </CardHeader>

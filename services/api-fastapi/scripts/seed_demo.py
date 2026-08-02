@@ -1,7 +1,7 @@
-"""One-time seed for Phase 1 demo data: org, 3 branches, the 11 demo accounts
-already referenced by the frontend's Login screen (password: demo123), and a
-small real menu + recipe per branch so the POS Terminal has something to sell
-and the deduction logic has ingredients to decrement.
+"""Seed for demo data: org, 5 companies x their locations (12 branches total,
+1 employee + 1 manager login each), plus a small real menu + recipe per
+branch so the POS Terminal has something to sell and the deduction logic has
+ingredients to decrement. Idempotent - safe to re-run.
 
 Run with: uv run python scripts/seed_demo.py
 """
@@ -85,6 +85,31 @@ def upsert_user(email, role, branch_id, full_name, employee_number):
     return user_id
 
 
+def upsert_discount_type(branch_id, name, percentage, vat_exempt=False):
+    existing = (
+        supabase.table("discount_types")
+        .select("*")
+        .eq("branch_id", branch_id)
+        .eq("name", name)
+        .execute()
+    )
+    if existing.data:
+        return existing.data[0]
+    return (
+        supabase.table("discount_types")
+        .insert(
+            {
+                "branch_id": branch_id,
+                "name": name,
+                "percentage": percentage,
+                "vat_exempt": vat_exempt,
+            }
+        )
+        .execute()
+        .data[0]
+    )
+
+
 def upsert_ingredient(branch_id, name, unit, stock, reorder, cost):
     existing = (
         supabase.table("ingredients")
@@ -142,78 +167,223 @@ def upsert_product(branch_id, name, category, price, recipe):
     return product
 
 
+# --- Companies -> locations (each location is its own branch/login) --------------
+# theme_key drives frontend BRANCH_CONFIG lookup - must exactly match
+# apps/dashboard-web/client/src/lib/types.ts's LOCATIONS keys.
+COMPANIES = [
+    {
+        "key": "danielito",
+        "name": "Danielito's Home Kitchen",
+        "branch_type": "fine_dining",
+        "block": 1000,
+        "locations": [
+            {"theme_key": "danielito-agapita", "label": "Agapita Road", "city": "Los Baños, Laguna"},
+            {"theme_key": "danielito-maitim", "label": "Bgy. Maitim Bay", "city": "Laguna"},
+            {"theme_key": "danielito-tagaytay", "label": "Tagaytay City", "city": "Tagaytay"},
+        ],
+    },
+    {
+        "key": "malaya",
+        "name": "Malaya's Cafe",
+        "branch_type": "cafe",
+        "block": 2000,
+        "locations": [
+            {"theme_key": "malaya-agapita", "label": "Agapita", "city": "Los Baños, Laguna"},
+            {"theme_key": "malaya-maitim", "label": "Brgy. Maitim Bay", "city": "Laguna"},
+            {"theme_key": "malaya-pitx", "label": "2/F PITX", "city": "Parañaque"},
+            {"theme_key": "malaya-jsh", "label": "JSH Bldg, Grove", "city": "Los Baños"},
+        ],
+    },
+    {
+        "key": "dden",
+        "name": "The Den",
+        "branch_type": "bar",
+        "block": 3000,
+        "locations": [
+            {"theme_key": "dden-agapita", "label": "Agapita Road", "city": "Los Baños, Laguna"},
+            {"theme_key": "dden-maitim", "label": "Brgy. Maitim Bay", "city": "Laguna"},
+        ],
+    },
+    {
+        "key": "dvenue",
+        "name": "D'Venue Events Place",
+        "branch_type": "events_venue",
+        "block": 4000,
+        "locations": [
+            {"theme_key": "dvenue-agapita", "label": "Agapita Road", "city": "Los Baños, Laguna"},
+            {"theme_key": "dvenue-maitim", "label": "Brgy. Maitim Bay", "city": "Laguna"},
+        ],
+    },
+    {
+        "key": "isabelas",
+        "name": "Isabela's Signature Caterer",
+        "branch_type": "catering_service",
+        "block": 5000,
+        "locations": [
+            {"theme_key": "isabelas-agapita", "label": "Agapita Road", "city": "Los Baños, Laguna"},
+        ],
+    },
+]
+
+# Menu/recipe seed data per company - applied to every location of that
+# company so each branch has real stock to sell in the POS demo.
+MENUS = {
+    "danielito": {
+        "ingredients": [
+            ("Oysters", "pc", 200, 20, 2.0),
+            ("Halibut Fillet", "g", 5000, 500, 0.08),
+            ("Dry-Aged Ribeye", "g", 8000, 800, 0.12),
+            ("Dark Chocolate", "g", 3000, 300, 0.05),
+        ],
+        "products": [
+            ("Oysters (3pc)", "appetizers", 18, [("Oysters", 3)]),
+            ("Pan-Seared Halibut", "mains", 42, [("Halibut Fillet", 220)]),
+            ("Dry-Aged Ribeye", "mains", 58, [("Dry-Aged Ribeye", 300)]),
+            ("Chocolate Souffle", "desserts", 16, [("Dark Chocolate", 80)]),
+        ],
+    },
+    "malaya": {
+        "ingredients": [
+            ("Matcha", "g", 500, 50, 2.5),
+            ("Liquid Sugar", "g", 2000, 200, 0.1),
+            ("Coffee Beans", "g", 3000, 300, 0.06),
+            ("Pastry Flour", "g", 5000, 500, 0.02),
+        ],
+        "products": [
+            ("Matcha Latte", "drinks", 5.5, [("Matcha", 2), ("Liquid Sugar", 3)]),
+            ("Espresso", "drinks", 3.0, [("Coffee Beans", 18)]),
+            ("Croissant", "pastries", 4.0, [("Pastry Flour", 90)]),
+        ],
+    },
+    "dden": {
+        "ingredients": [
+            ("Whiskey", "ml", 5000, 500, 0.15),
+            ("Angostura Bitters", "ml", 500, 50, 0.3),
+            ("White Rum", "ml", 5000, 500, 0.12),
+            ("Mint Leaves", "g", 1000, 100, 0.04),
+        ],
+        "products": [
+            ("Old Fashioned", "cocktails", 14, [("Whiskey", 60), ("Angostura Bitters", 4)]),
+            ("Mojito", "cocktails", 13, [("White Rum", 50), ("Mint Leaves", 6)]),
+            ("Whiskey Neat", "spirits", 12, [("Whiskey", 45)]),
+        ],
+    },
+    "dvenue": {
+        "ingredients": [
+            ("Chicken Thigh", "g", 20000, 2000, 0.06),
+            ("Jasmine Rice", "g", 30000, 3000, 0.015),
+            ("Mixed Vegetables", "g", 10000, 1000, 0.03),
+        ],
+        "products": [
+            ("Chicken & Rice Tray (50pax)", "trays", 250, [("Chicken Thigh", 6000), ("Jasmine Rice", 9000)]),
+            ("Vegetable Tray (50pax)", "trays", 120, [("Mixed Vegetables", 5000)]),
+        ],
+    },
+    "isabelas": {
+        "ingredients": [
+            ("Chicken Thigh", "g", 20000, 2000, 0.06),
+            ("Jasmine Rice", "g", 30000, 3000, 0.015),
+            ("Mixed Vegetables", "g", 10000, 1000, 0.03),
+        ],
+        "products": [
+            ("Chicken & Rice Tray (50pax)", "trays", 250, [("Chicken Thigh", 6000), ("Jasmine Rice", 9000)]),
+            ("Vegetable Tray (50pax)", "trays", 120, [("Mixed Vegetables", 5000)]),
+        ],
+    },
+}
+
+
+# Breakable dishware/utensils common to every location, tracked as
+# ingredients (unit "pc") purely so they're selectable in the Loss Log
+# dropdown under the "Breakage" reason - not used in any recipe.
+SUPPLIES = [
+    ("Glass Cup", "pc", 100, 20, 15.0),
+    ("Coffee Cup", "pc", 100, 20, 25.0),
+    ("Straws", "pc", 500, 100, 0.5),
+    ("Plates", "pc", 100, 20, 30.0),
+    ("Spoon", "pc", 100, 20, 10.0),
+    ("Fork", "pc", 100, 20, 10.0),
+]
+
+
+def seed_menu_for_branch(company_key, branch):
+    menu = MENUS[company_key]
+    ingredients_by_name = {}
+    for name, unit, stock, reorder, cost in menu["ingredients"]:
+        ingredients_by_name[name] = upsert_ingredient(branch["id"], name, unit, stock, reorder, cost)
+    for name, category, price, recipe in menu["products"]:
+        upsert_product(
+            branch["id"],
+            name,
+            category,
+            price,
+            [(ingredients_by_name[ing_name], qty) for ing_name, qty in recipe],
+        )
+    for name, unit, stock, reorder, cost in SUPPLIES:
+        upsert_ingredient(branch["id"], name, unit, stock, reorder, cost)
+    # Senior Citizen/PWD are VAT-exempt by PH law (RA 9994/RA 10754) in
+    # addition to the percentage off; Employee Discount is a plain % off.
+    upsert_discount_type(branch["id"], "Employee Discount", 10, vat_exempt=False)
+    upsert_discount_type(branch["id"], "Senior Citizen", 20, vat_exempt=True)
+    upsert_discount_type(branch["id"], "PWD", 20, vat_exempt=True)
+
+
 def main():
     org = upsert_org()
 
-    danielito = upsert_branch(org["id"], "Danielito's Home Kitchen", "fine_dining", "danielito")
-    malaya = upsert_branch(org["id"], "Malaya's Cafe", "cafe", "malaya")
-    dden = upsert_branch(org["id"], "D'Den", "bar", "dden")
-    catering = upsert_branch(org["id"], "Saint Michael Food Corp Catering", "catering", "catering")
+    all_branches = []  # (company_key, location, branch)
+    employee_numbers = []
 
-    demo_accounts = [
-        # email, role, branch, full_name, employee_number (kiosk login, PIN is DEMO_PIN for all)
-        ("marco@danielito.com", "employee", danielito["id"], "Marco", "EMP-1001"),
-        ("rosa@danielito.com", "employee", danielito["id"], "Rosa", "EMP-1002"),
-        ("luis@danielito.com", "manager", danielito["id"], "Chef Luis", "EMP-1003"),
-        ("ana@malaya.com", "employee", malaya["id"], "Ana", "EMP-2001"),
-        ("javier@malaya.com", "employee", malaya["id"], "Javier", "EMP-2002"),
-        ("sofia@malaya.com", "manager", malaya["id"], "Sofia", "EMP-2003"),
-        ("diego@dden.com", "employee", dden["id"], "Diego", "EMP-3001"),
-        ("carmen@dden.com", "employee", dden["id"], "Carmen", "EMP-3002"),
-        ("victor@dden.com", "manager", dden["id"], "Victor", "EMP-3003"),
-        ("liza@catering.com", "employee", catering["id"], "Liza", "EMP-4001"),
-        ("ramon@catering.com", "manager", catering["id"], "Ramon", "EMP-4002"),
-        ("exec@corp.com", "executive", None, "Corporate Executive", "EMP-9001"),
-        ("ops@corp.com", "executive", None, "Operations Executive", "EMP-9002"),
-    ]
-    for email, role, branch_id, full_name, employee_number in demo_accounts:
-        upsert_user(email, role, branch_id, full_name, employee_number)
+    for company in COMPANIES:
+        for i, location in enumerate(company["locations"], start=1):
+            branch = upsert_branch(
+                org["id"],
+                f"{company['name']} - {location['label']}",
+                company["branch_type"],
+                location["theme_key"],
+            )
+            all_branches.append((company["key"], location, branch))
 
-    # --- Danielito's Home Kitchen -------------------------------------------------
-    oysters = upsert_ingredient(danielito["id"], "Oysters", "pc", 200, 20, 2.0)
-    halibut = upsert_ingredient(danielito["id"], "Halibut Fillet", "g", 5000, 500, 0.08)
-    ribeye = upsert_ingredient(danielito["id"], "Dry-Aged Ribeye", "g", 8000, 800, 0.12)
-    cocoa = upsert_ingredient(danielito["id"], "Dark Chocolate", "g", 3000, 300, 0.05)
+            # One employee + one manager per location.
+            emp_number = f"EMP-{company['block'] + i * 10 + 1}"
+            mgr_number = f"EMP-{company['block'] + i * 10 + 2}"
+            upsert_user(
+                f"employee@{location['theme_key']}.com",
+                "employee",
+                branch["id"],
+                f"Employee - {location['label']}",
+                emp_number,
+            )
+            upsert_user(
+                f"manager@{location['theme_key']}.com",
+                "manager",
+                branch["id"],
+                f"Manager - {location['label']}",
+                mgr_number,
+            )
+            employee_numbers.extend([emp_number, mgr_number])
 
-    upsert_product(danielito["id"], "Oysters (3pc)", "appetizers", 18, [(oysters, 3)])
-    upsert_product(danielito["id"], "Pan-Seared Halibut", "mains", 42, [(halibut, 220)])
-    upsert_product(danielito["id"], "Dry-Aged Ribeye", "mains", 58, [(ribeye, 300)])
-    upsert_product(danielito["id"], "Chocolate Souffle", "desserts", 16, [(cocoa, 80)])
+            seed_menu_for_branch(company["key"], branch)
 
-    # --- Malaya's Cafe ----------------------------------------------------------
-    matcha = upsert_ingredient(malaya["id"], "Matcha", "g", 500, 50, 2.5)
-    syrup = upsert_ingredient(malaya["id"], "Liquid Sugar", "g", 2000, 200, 0.1)
-    coffee_beans = upsert_ingredient(malaya["id"], "Coffee Beans", "g", 3000, 300, 0.06)
-    flour = upsert_ingredient(malaya["id"], "Pastry Flour", "g", 5000, 500, 0.02)
-
-    upsert_product(malaya["id"], "Matcha Latte", "drinks", 5.5, [(matcha, 2), (syrup, 3)])
-    upsert_product(malaya["id"], "Espresso", "drinks", 3.0, [(coffee_beans, 18)])
-    upsert_product(malaya["id"], "Croissant", "pastries", 4.0, [(flour, 90)])
-
-    # --- D'Den --------------------------------------------------------------------
-    whiskey = upsert_ingredient(dden["id"], "Whiskey", "ml", 5000, 500, 0.15)
-    bitters = upsert_ingredient(dden["id"], "Angostura Bitters", "ml", 500, 50, 0.3)
-    rum = upsert_ingredient(dden["id"], "White Rum", "ml", 5000, 500, 0.12)
-    mint = upsert_ingredient(dden["id"], "Mint Leaves", "g", 1000, 100, 0.04)
-
-    upsert_product(dden["id"], "Old Fashioned", "cocktails", 14, [(whiskey, 60), (bitters, 4)])
-    upsert_product(dden["id"], "Mojito", "cocktails", 13, [(rum, 50), (mint, 6)])
-    upsert_product(dden["id"], "Whiskey Neat", "spirits", 12, [(whiskey, 45)])
-
-    # --- Catering -------------------------------------------------------------------
-    chicken = upsert_ingredient(catering["id"], "Chicken Thigh", "g", 20000, 2000, 0.06)
-    rice = upsert_ingredient(catering["id"], "Jasmine Rice", "g", 30000, 3000, 0.015)
-    veg_tray = upsert_ingredient(catering["id"], "Mixed Vegetables", "g", 10000, 1000, 0.03)
-
-    upsert_product(catering["id"], "Chicken & Rice Tray (50pax)", "trays", 250, [(chicken, 6000), (rice, 9000)])
-    upsert_product(catering["id"], "Vegetable Tray (50pax)", "trays", 120, [(veg_tray, 5000)])
+    upsert_user("exec@corp.com", "executive", None, "Corporate Executive", "EMP-9001")
+    upsert_user("ops@corp.com", "executive", None, "Operations Executive", "EMP-9002")
+    employee_numbers.extend(["EMP-9001", "EMP-9002"])
 
     print("Seed complete.")
     print(f"Organization: {org['id']}")
-    print(f"Branches: danielito={danielito['id']} malaya={malaya['id']} dden={dden['id']} catering={catering['id']}")
+    print(f"Branches seeded: {len(all_branches)}")
+    for company_key, location, branch in all_branches:
+        print(f"  {company_key}: {location['theme_key']} -> {branch['id']}")
     print(f"Demo password for all accounts: {DEMO_PASSWORD}")
     print(f"Demo kiosk PIN for all accounts: {DEMO_PIN}")
-    print("Kiosk employee numbers: " + ", ".join(f"{n}={e}" for e, _, _, _, n in demo_accounts))
+    print("Kiosk employee numbers: " + ", ".join(employee_numbers))
+    print(
+        "\nNOTE: old 2nd-employee demo accounts from the previous 4-branch "
+        "seed (e.g. rosa@danielito.com, javier@malaya.com, carmen@dden.com) "
+        "are no longer created by this script. They still exist in Supabase "
+        "auth/profiles if seeded before - deactivate or delete them manually "
+        "to match the new 1-employee-1-manager-per-location rule."
+    )
 
 
 if __name__ == "__main__":
