@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import {
   ApiAttendanceLog,
   ApiPayrollRow,
+  ApiBranch,
   ClockOutRequest,
   clockOut,
   fetchMyAttendance,
@@ -25,6 +26,7 @@ import {
   ApiPayrollSummary,
   createEmployee,
   updateEmployee,
+  fetchBranches,
 } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { BRANCH_CONFIG } from '@/lib/types';
@@ -72,13 +74,35 @@ export default function HRAttendance() {
   const [newEmployeeForm, setNewEmployeeForm] = useState({ full_name: '', role: 'employee' as 'employee' | 'manager', position: '', pay_rate: '' });
   const [createdEmployee, setCreatedEmployee] = useState<ApiEmployeeCreated | null>(null);
 
+  // Managers act on their own branch; executives have no fixed branch, so
+  // they pick one from the same real-location allow-list used elsewhere
+  // (e.g. POS Management) - without this, Employee Management/Payroll here
+  // silently show nothing for executives since user.branchId is null.
+  const isExecutive = user?.role === 'executive';
+  const [branches, setBranches] = useState<ApiBranch[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+
   useEffect(() => {
-    if (!user?.id || !user?.branchId) return;
-    loadMyAttendance();
-    if (user.role === 'manager' || user.role === 'executive') {
-      loadBranchData();
-    }
-  }, [user?.id, user?.branchId, user?.role]);
+    if (!isExecutive) return;
+    fetchBranches()
+      .then((all) => {
+        const real = all.filter((b) => b.theme_key in BRANCH_CONFIG);
+        setBranches(real);
+        if (real.length > 0) setSelectedBranchId((prev) => prev ?? real[0].id);
+      })
+      .catch(() => toast.error('Could not load branches'));
+  }, [isExecutive]);
+
+  const activeBranchId = isExecutive ? selectedBranchId : user?.branchId ?? null;
+
+  useEffect(() => {
+    if (user?.id && user?.branchId) loadMyAttendance();
+  }, [user?.id, user?.branchId]);
+
+  useEffect(() => {
+    if (!activeBranchId || (user?.role !== 'manager' && user?.role !== 'executive')) return;
+    loadBranchData();
+  }, [activeBranchId, user?.role]);
 
   const loadMyAttendance = async () => {
     if (!user?.id) return;
@@ -91,12 +115,12 @@ export default function HRAttendance() {
   };
 
   const loadBranchData = async () => {
-    if (!user?.branchId) return;
+    if (!activeBranchId) return;
     setLoading(true);
     try {
       const [empData, attData] = await Promise.all([
-        fetchEmployees(user.branchId),
-        fetchBranchAttendance(user.branchId, payrollPeriod.start, payrollPeriod.end),
+        fetchEmployees(activeBranchId),
+        fetchBranchAttendance(activeBranchId, payrollPeriod.start, payrollPeriod.end),
       ]);
       setEmployees(empData);
       setBranchAttendance(attData);
@@ -111,10 +135,10 @@ export default function HRAttendance() {
   };
 
   const loadPayrollSummary = async () => {
-    if (!user?.branchId) return;
+    if (!activeBranchId) return;
     setPayrollLoading(true);
     try {
-      const data = await fetchPayrollSummary(user.branchId, payrollPeriod.start, payrollPeriod.end);
+      const data = await fetchPayrollSummary(activeBranchId, payrollPeriod.start, payrollPeriod.end);
       setPayrollSummary(data);
     } catch (error) {
       toast.error('Failed to load payroll summary');
@@ -157,14 +181,14 @@ export default function HRAttendance() {
 
   const handleCreateEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.branchId || !newEmployeeForm.full_name.trim()) {
+    if (!activeBranchId || !newEmployeeForm.full_name.trim()) {
       toast.error('Enter a name for the new employee');
       return;
     }
     setAddEmployeeSubmitting(true);
     try {
       const created = await createEmployee({
-        branch_id: user.branchId,
+        branch_id: activeBranchId,
         full_name: newEmployeeForm.full_name.trim(),
         role: newEmployeeForm.role,
         position: newEmployeeForm.position || undefined,
@@ -207,7 +231,30 @@ export default function HRAttendance() {
   return (
     <DashboardLayout title={user?.role === 'employee' ? 'Time Clock' : 'HR Attendance'}>
       <div className="p-6 space-y-6">
-        {/* Employee Personal Time Clock */}
+        {isExecutive && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="space-y-1 max-w-xs">
+                <label className="text-sm font-medium text-foreground font-corp-body">Branch</label>
+                <Select value={selectedBranchId ?? undefined} onValueChange={setSelectedBranchId}>
+                  <SelectTrigger className="font-corp-body">
+                    <SelectValue placeholder="Select a branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Employee/Manager Personal Time Clock - executives have no kiosk shift of their own */}
+        {!isExecutive && (
         <Card className="border-l-4" style={{ borderLeftColor: branchColor }}>
           <CardHeader>
             <CardTitle className="font-corp-display flex items-center gap-2">
@@ -274,6 +321,7 @@ export default function HRAttendance() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Manager/Executive Views */}
         {(user?.role === 'manager' || user?.role === 'executive') && (

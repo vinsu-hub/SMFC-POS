@@ -15,11 +15,13 @@ import { BRANCH_CONFIG } from '@/lib/types';
 import {
   ApiPayrollSummary,
   ApiPayrollRow,
+  ApiBranch,
   fetchPayrollSummary,
   fetchPayrollReceiptPdf,
   fetchPayrollReceiptsZip,
   fetchEmployees,
   updateEmployee,
+  fetchBranches,
 } from '@/lib/api';
 
 export default function HRPayroll() {
@@ -36,18 +38,39 @@ export default function HRPayroll() {
   });
   const [activeTab, setActiveTab] = useState('current');
 
+  // Managers act on their own branch; executives have no fixed branch, so
+  // they pick one from the same real-location allow-list used elsewhere
+  // (e.g. POS Management) - without this, this whole page silently no-ops
+  // for executives since user.branchId is null.
+  const isExecutive = user?.role === 'executive';
+  const [branches, setBranches] = useState<ApiBranch[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+
   useEffect(() => {
-    if (!user?.branchId) return;
+    if (!isExecutive) return;
+    fetchBranches()
+      .then((all) => {
+        const real = all.filter((b) => b.theme_key in BRANCH_CONFIG);
+        setBranches(real);
+        if (real.length > 0) setSelectedBranchId((prev) => prev ?? real[0].id);
+      })
+      .catch(() => toast.error('Could not load branches'));
+  }, [isExecutive]);
+
+  const activeBranchId = isExecutive ? selectedBranchId : user?.branchId ?? null;
+
+  useEffect(() => {
+    if (!activeBranchId) return;
     loadData();
-  }, [user?.branchId, payrollPeriod]);
+  }, [activeBranchId, payrollPeriod]);
 
   const loadData = async () => {
-    if (!user?.branchId) return;
+    if (!activeBranchId) return;
     setLoading(true);
     try {
       const [empData, payrollData] = await Promise.all([
-        fetchEmployees(user.branchId),
-        fetchPayrollSummary(user.branchId, payrollPeriod.start, payrollPeriod.end),
+        fetchEmployees(activeBranchId),
+        fetchPayrollSummary(activeBranchId, payrollPeriod.start, payrollPeriod.end),
       ]);
       setEmployees(empData);
       setPayrollSummary(payrollData);
@@ -115,6 +138,27 @@ export default function HRPayroll() {
   return (
     <DashboardLayout title="HR Payroll">
       <div className="p-6 space-y-6">
+        {isExecutive && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="space-y-1 max-w-xs">
+                <label className="text-sm font-medium text-foreground font-corp-body">Branch</label>
+                <Select value={selectedBranchId ?? undefined} onValueChange={setSelectedBranchId}>
+                  <SelectTrigger className="font-corp-body">
+                    <SelectValue placeholder="Select a branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         {/* Period Selector */}
         <Card>
           <CardContent className="p-4">
