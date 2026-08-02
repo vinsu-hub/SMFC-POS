@@ -234,10 +234,15 @@ MENUS = {
             ("Halibut Fillet", "g", 5000, 500, 0.08),
             ("Dry-Aged Ribeye", "g", 8000, 800, 0.12),
             ("Dark Chocolate", "g", 3000, 300, 0.05),
+            # Multi-ingredient recipe test data - lets Order Queue's "hold
+            # ingredient" edit be exercised on Pan-Seared Halibut (e.g. "no
+            # rice") instead of only a single-ingredient dish.
+            ("Jasmine Rice", "g", 10000, 1000, 0.015),
+            ("Lemon Butter Sauce", "g", 3000, 300, 0.04),
         ],
         "products": [
             ("Oysters (3pc)", "appetizers", 18, [("Oysters", 3)]),
-            ("Pan-Seared Halibut", "mains", 42, [("Halibut Fillet", 220)]),
+            ("Pan-Seared Halibut", "mains", 42, [("Halibut Fillet", 220), ("Jasmine Rice", 100), ("Lemon Butter Sauce", 30)]),
             ("Dry-Aged Ribeye", "mains", 58, [("Dry-Aged Ribeye", 300)]),
             ("Chocolate Souffle", "desserts", 16, [("Dark Chocolate", 80)]),
         ],
@@ -305,6 +310,14 @@ SUPPLIES = [
     ("Fork", "pc", 100, 20, 10.0),
 ]
 
+# Temporary test stock seeded to every branch (not just Malaya's, which
+# already has it for its own menu) so Transfer Out / Request Stock / Receive
+# Stock can be exercised between any two branches, including ones that don't
+# naturally carry the same ingredients.
+TEST_TRANSFER_STOCK = [
+    ("Coffee Beans", "g", 3000, 300, 0.06),
+]
+
 
 def seed_menu_for_branch(company_key, branch):
     menu = MENUS[company_key]
@@ -320,6 +333,11 @@ def seed_menu_for_branch(company_key, branch):
             [(ingredients_by_name[ing_name], qty) for ing_name, qty in recipe],
         )
     for name, unit, stock, reorder, cost in SUPPLIES:
+        upsert_ingredient(branch["id"], name, unit, stock, reorder, cost)
+    for name, unit, stock, reorder, cost in TEST_TRANSFER_STOCK:
+        # Malaya's already has Coffee Beans as a real menu ingredient -
+        # upsert_ingredient no-ops if it already exists, so this only adds
+        # it for branches that don't otherwise carry it.
         upsert_ingredient(branch["id"], name, unit, stock, reorder, cost)
     # Senior Citizen/PWD are VAT-exempt by PH law (RA 9994/RA 10754) in
     # addition to the percentage off; Employee Discount is a plain % off.

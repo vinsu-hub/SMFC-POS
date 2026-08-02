@@ -26,6 +26,7 @@ interface User {
 
 export default function Settings() {
   const { user, logout } = useAuth();
+  const isEmployee = user?.role === 'employee';
   const [activeTab, setActiveTab] = useState('general');
 
   // General Settings
@@ -139,6 +140,34 @@ export default function Settings() {
         return 'bg-secondary text-foreground';
     }
   };
+
+  if (isEmployee) {
+    return (
+      <DashboardLayout title="Settings">
+        <div className="p-6">
+          <Card className="border-l-4 border-l-primary max-w-lg">
+            <CardHeader>
+              <CardTitle className="font-corp-display">Account Settings</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm font-corp-body text-muted-foreground mb-2">Current User</p>
+                <p className="font-corp-display font-semibold text-foreground">{user?.email}</p>
+                <p className="text-xs text-muted-foreground capitalize">Role: {user?.role}</p>
+              </div>
+              <Button
+                onClick={logout}
+                variant="outline"
+                className="w-full font-corp-body text-destructive border-error-bg hover:bg-error-bg"
+              >
+                Sign Out
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="Settings">
