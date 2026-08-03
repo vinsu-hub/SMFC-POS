@@ -53,10 +53,14 @@ def create_loss_record(
     unit_cost = float(ingredient_result.data["unit_cost"])
     cost_impact = round(unit_cost * body.quantity, 2)
 
-    new_stock = float(ingredient_result.data["current_stock"]) - body.quantity
-    supabase.table("ingredients").update({"current_stock": new_stock}).eq(
-        "id", body.ingredient_id
-    ).execute()
+    # A count-driven shrinkage loss (skip_stock_deduction=True) is logged
+    # after Count Stock has already set current_stock to the true physical
+    # count -- deducting again here would double-count the shortage.
+    if not body.skip_stock_deduction:
+        new_stock = float(ingredient_result.data["current_stock"]) - body.quantity
+        supabase.table("ingredients").update({"current_stock": new_stock}).eq(
+            "id", body.ingredient_id
+        ).execute()
 
     insert_result = (
         supabase.table("loss_records")
@@ -70,6 +74,7 @@ def create_loss_record(
                 "quantity": body.quantity,
                 "cost_impact": cost_impact,
                 "photo_url": body.photo_url,
+                "reference_id": body.reference_id,
             }
         )
         .execute()

@@ -93,7 +93,7 @@ export interface ApiIngredient {
   expiry_date: string | null;
 }
 
-export type LossReason = 'spoilage' | 'breakage' | 'comp' | 'prep_error';
+export type LossReason = 'spoilage' | 'breakage' | 'comp' | 'prep_error' | 'shrinkage';
 
 export interface CreateLossRecordRequest {
   branch_id: string;
@@ -103,6 +103,8 @@ export interface CreateLossRecordRequest {
   reason: LossReason;
   quantity: number;
   photo_url?: string | null;
+  reference_id?: string | null;
+  skip_stock_deduction?: boolean;
 }
 
 export interface ApiLossRecord {
@@ -115,11 +117,12 @@ export interface ApiLossRecord {
   quantity: number;
   cost_impact: number;
   photo_url: string | null;
+  reference_id: string | null;
   created_at: string;
 }
 
 // --- Inventory Movements ---
-export type MovementType = 'trans_in' | 'trans_out' | 'delivery' | 'transfer_in' | 'transfer_out';
+export type MovementType = 'trans_in' | 'trans_out' | 'delivery' | 'transfer_in' | 'transfer_out' | 'count_adjustment';
 
 export interface ApiInventoryMovement {
   id: string;
@@ -131,6 +134,9 @@ export interface ApiInventoryMovement {
   reference_id: string | null;
   employee_id: string;
   unit_cost_snapshot: number | null;
+  previous_stock: number | null;
+  counted_stock: number | null;
+  variance: number | null;
   created_at: string;
 }
 
@@ -593,13 +599,20 @@ export function fetchInventory(branchId: string): Promise<ApiIngredient[]> {
   return request(`/inventory?branch_id=${branchId}`);
 }
 
+export interface ApiInventoryCountResult {
+  ingredient: ApiIngredient;
+  movement: ApiInventoryMovement | null;
+  variance: number;
+}
+
 export function submitInventoryCount(
   ingredientId: string,
-  countedStock: number
-): Promise<ApiIngredient> {
+  countedStock: number,
+  employeeId: string
+): Promise<ApiInventoryCountResult> {
   return request(`/inventory/${ingredientId}/count`, {
     method: 'POST',
-    body: JSON.stringify({ counted_stock: countedStock }),
+    body: JSON.stringify({ counted_stock: countedStock, employee_id: employeeId }),
   });
 }
 

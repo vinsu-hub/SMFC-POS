@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, AlertCircle, Loader2, Truck, ArrowUpRight, ArrowDownLeft, Package, Send, RefreshCw, PackagePlus, CheckCircle2 } from 'lucide-react';
+import { Plus, AlertCircle, Loader2, Truck, ArrowUpRight, ArrowDownLeft, Package, Send, RefreshCw, PackagePlus, CheckCircle2, ClipboardCheck, TrendingUp, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 import { BRANCH_CONFIG } from '@/lib/types';
@@ -35,12 +35,28 @@ import {
   ApiStockRequest,
 } from '@/lib/api';
 
+// The manual "create movement" dialog's type picker — deliberately excludes
+// transfer_in (only ever produced by confirming a transfer) and
+// count_adjustment (only ever produced by Count Stock), neither of which
+// should be hand-created here.
 const MOVEMENT_TYPES: { value: MovementType; label: string; icon: React.ReactNode; color: string }[] = [
   { value: 'trans_in', label: 'Receive Stock', icon: <ArrowDownLeft className="w-4 h-4" />, color: 'bg-success-bg text-success' },
   { value: 'trans_out', label: 'Remove Stock', icon: <ArrowUpRight className="w-4 h-4" />, color: 'bg-error-bg text-destructive' },
   { value: 'delivery', label: 'Delivery', icon: <Truck className="w-4 h-4" />, color: 'bg-warning-bg text-warning' },
   { value: 'transfer_out', label: 'Transfer Out', icon: <Send className="w-4 h-4" />, color: 'bg-accent-soft text-accent-foreground' },
 ];
+
+// Full display config for every movement type, used by Recent Movements —
+// a superset of MOVEMENT_TYPES since it also needs to render transfer_in
+// and count_adjustment rows, which never appear in the create dialog.
+const MOVEMENT_DISPLAY: Record<MovementType, { label: string; icon: React.ReactNode; color: string }> = {
+  trans_in: { label: 'Receive Stock', icon: <ArrowDownLeft className="w-4 h-4" />, color: 'bg-success-bg text-success' },
+  trans_out: { label: 'Remove Stock', icon: <ArrowUpRight className="w-4 h-4" />, color: 'bg-error-bg text-destructive' },
+  delivery: { label: 'Delivery', icon: <Truck className="w-4 h-4" />, color: 'bg-warning-bg text-warning' },
+  transfer_in: { label: 'Transfer In', icon: <ArrowDownLeft className="w-4 h-4" />, color: 'bg-accent-soft text-accent-foreground' },
+  transfer_out: { label: 'Transfer Out', icon: <Send className="w-4 h-4" />, color: 'bg-accent-soft text-accent-foreground' },
+  count_adjustment: { label: 'Stock Count Adjustment', icon: <ClipboardCheck className="w-4 h-4" />, color: 'bg-accent-soft text-accent-foreground' },
+};
 
 const TRANSFER_STATUS_COLORS: Record<string, string> = {
   pending: 'bg-warning-bg text-warning',
@@ -49,24 +65,22 @@ const TRANSFER_STATUS_COLORS: Record<string, string> = {
   cancelled: 'bg-muted-foreground/50 text-muted-foreground',
 };
 
-function getMovementColor(type: MovementType) {
-  switch (type) {
-    case 'trans_in': return 'bg-success-bg text-success';
-    case 'trans_out': return 'bg-error-bg text-destructive';
-    case 'delivery': return 'bg-warning-bg text-warning';
-    case 'transfer_in': return 'bg-accent-soft text-accent-foreground';
-    case 'transfer_out': return 'bg-accent-soft text-accent-foreground';
+function getMovementColor(movement: ApiInventoryMovement) {
+  if (movement.type === 'count_adjustment' && movement.variance !== null) {
+    return movement.variance > 0 ? 'bg-warning-bg text-warning' : 'bg-error-bg text-destructive';
   }
+  return MOVEMENT_DISPLAY[movement.type]?.color ?? 'bg-accent-soft text-accent-foreground';
 }
 
 function getMovementLabel(type: MovementType) {
-  const t = MOVEMENT_TYPES.find(m => m.value === type);
-  return t?.label ?? type;
+  return MOVEMENT_DISPLAY[type]?.label ?? type;
 }
 
-function getMovementIcon(type: MovementType) {
-  const t = MOVEMENT_TYPES.find(m => m.value === type);
-  return t?.icon ?? <Package className="w-4 h-4" />;
+function getMovementIcon(movement: ApiInventoryMovement) {
+  if (movement.type === 'count_adjustment' && movement.variance !== null) {
+    return movement.variance > 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />;
+  }
+  return MOVEMENT_DISPLAY[movement.type]?.icon ?? <Package className="w-4 h-4" />;
 }
 
 export default function InventoryMovements() {
@@ -485,19 +499,34 @@ export default function InventoryMovements() {
                   <TableBody>
                     {movements.slice(0, 50).map((mov) => {
                       const ingredient = ingredients.find(i => i.id === mov.ingredient_id);
+                      const sign =
+                        mov.type === 'count_adjustment' && mov.variance !== null
+                          ? mov.variance > 0
+                            ? '+'
+                            : '-'
+                          : mov.type.startsWith('trans_out') || mov.type === 'transfer_out'
+                            ? '-'
+                            : '+';
                       return (
                         <TableRow key={mov.id} className="font-corp-body">
                           <TableCell>
-                            <Badge className={getMovementColor(mov.type)} variant="outline">
+                            <Badge className={getMovementColor(mov)} variant="outline">
                               <div className="flex items-center gap-1">
-                                {getMovementIcon(mov.type)}
+                                {getMovementIcon(mov)}
                                 <span>{getMovementLabel(mov.type)}</span>
                               </div>
                             </Badge>
                           </TableCell>
-                          <TableCell className="font-medium">{ingredient?.name ?? 'Unknown'}</TableCell>
+                          <TableCell className="font-medium">
+                            {ingredient?.name ?? 'Unknown'}
+                            {mov.type === 'count_adjustment' && mov.previous_stock !== null && mov.counted_stock !== null && (
+                              <p className="text-xs text-muted-foreground font-normal">
+                                {mov.previous_stock} → {mov.counted_stock}
+                              </p>
+                            )}
+                          </TableCell>
                           <TableCell className="text-right font-corp-mono">
-                            {mov.type.startsWith('trans_out') || mov.type === 'transfer_out' ? '-' : '+'}{mov.quantity}
+                            {sign}{mov.quantity}
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm">{mov.reason ?? '—'}</TableCell>
                           <TableCell className="text-sm font-corp-mono">{new Date(mov.created_at).toLocaleString()}</TableCell>

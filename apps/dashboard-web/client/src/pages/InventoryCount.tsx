@@ -6,18 +6,46 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CheckCircle, Loader2, Package } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertCircle, CheckCircle, Loader2, Package, TrendingDown, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
-import { ApiIngredient, fetchInventory, submitInventoryCount } from '@/lib/api';
+import {
+  ApiIngredient,
+  ApiInventoryCountResult,
+  LossReason,
+  createLossRecord,
+  fetchInventory,
+  submitInventoryCount,
+} from '@/lib/api';
 import { BRANCH_CONFIG } from '@/lib/types';
 
-type ItemStatus = 'pending' | 'counted' | 'variance';
+type ItemStatus = 'pending' | 'counted' | 'overage' | 'shortage';
+
+const SHRINKAGE_REASONS: { value: LossReason; label: string }[] = [
+  { value: 'shrinkage', label: 'Shrinkage (unexplained)' },
+  { value: 'spoilage', label: 'Spoilage' },
+  { value: 'breakage', label: 'Breakage' },
+  { value: 'prep_error', label: 'Prep Error' },
+  { value: 'comp', label: 'Complimentary' },
+];
+
+interface ShrinkageItem {
+  ingredientId: string;
+  ingredientName: string;
+  unit: string;
+  quantity: number;
+  movementId: string | null;
+  reason: LossReason;
+  logged: boolean;
+}
 
 function computeStatus(expected: number, counted: number | null): ItemStatus {
   if (counted === null) return 'pending';
   const variancePercent = expected === 0 ? 0 : ((counted - expected) / expected) * 100;
-  return Math.abs(variancePercent) > 5 ? 'variance' : 'counted';
+  if (Math.abs(variancePercent) <= 5) return 'counted';
+  return variancePercent > 0 ? 'overage' : 'shortage';
 }
 
 export default function InventoryCount() {
@@ -26,6 +54,9 @@ export default function InventoryCount() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [countedValues, setCountedValues] = useState<Record<string, string>>({});
+  const [shrinkageDialogOpen, setShrinkageDialogOpen] = useState(false);
+  const [shrinkageItems, setShrinkageItems] = useState<ShrinkageItem[]>([]);
+  const [loggingId, setLoggingId] = useState<string | null>(null);
 
   const loadInventory = () => {
     if (!user?.branchId) return;
@@ -48,15 +79,39 @@ export default function InventoryCount() {
       toast.error(`Please count all items. ${ingredients.length - entries.length} remaining.`);
       return;
     }
+    if (!user?.id) {
+      toast.error('No user account found');
+      return;
+    }
 
     setSubmitting(true);
     try {
-      await Promise.all(
-        entries.map(([id, value]) => submitInventoryCount(id, parseFloat(value)))
+      const results: ApiInventoryCountResult[] = await Promise.all(
+        entries.map(([id, value]) => submitInventoryCount(id, parseFloat(value), user.id))
       );
       toast.success('Inventory count saved. Stock levels updated.');
+
+      const shortages = results
+        .filter((r) => r.variance < 0)
+        .map(
+          (r): ShrinkageItem => ({
+            ingredientId: r.ingredient.id,
+            ingredientName: r.ingredient.name,
+            unit: r.ingredient.unit,
+            quantity: Math.abs(r.variance),
+            movementId: r.movement?.id ?? null,
+            reason: 'shrinkage',
+            logged: false,
+          })
+        );
+
       setCountedValues({});
       loadInventory();
+
+      if (shortages.length > 0) {
+        setShrinkageItems(shortages);
+        setShrinkageDialogOpen(true);
+      }
     } catch (error) {
       toast.error('Could not save the count. Try again.');
       console.error(error);
@@ -65,21 +120,65 @@ export default function InventoryCount() {
     }
   };
 
+  const handleLogShrinkage = async (item: ShrinkageItem) => {
+    if (!user?.id || !user?.branchId) return;
+    setLoggingId(item.ingredientId);
+    try {
+      await createLossRecord({
+        branch_id: user.branchId,
+        employee_id: user.id,
+        ingredient_id: item.ingredientId,
+        reason: item.reason,
+        quantity: item.quantity,
+        reference_id: item.movementId ?? undefined,
+        skip_stock_deduction: true,
+      });
+      toast.success(`${item.ingredientName} logged as a loss`);
+      setShrinkageItems((prev) =>
+        prev.map((i) => (i.ingredientId === item.ingredientId ? { ...i, logged: true } : i))
+      );
+    } catch (error) {
+      toast.error(`Could not log ${item.ingredientName}. Try again.`);
+      console.error(error);
+    } finally {
+      setLoggingId(null);
+    }
+  };
+
+  const updateShrinkageReason = (ingredientId: string, reason: LossReason) => {
+    setShrinkageItems((prev) =>
+      prev.map((i) => (i.ingredientId === ingredientId ? { ...i, reason } : i))
+    );
+  };
+
   const getStatusIcon = (status: ItemStatus) => {
     switch (status) {
       case 'counted':
         return <CheckCircle className="w-4 h-4 text-success" />;
-      case 'variance':
-        return <AlertCircle className="w-4 h-4 text-destructive" />;
+      case 'overage':
+        return <TrendingUp className="w-4 h-4 text-warning" />;
+      case 'shortage':
+        return <TrendingDown className="w-4 h-4 text-destructive" />;
       default:
         return <Package className="w-4 h-4 text-muted-foreground" />;
+    }
+  };
+
+  const getStatusLabel = (status: ItemStatus) => {
+    switch (status) {
+      case 'overage':
+        return 'Overage';
+      case 'shortage':
+        return 'Shortage';
+      default:
+        return null;
     }
   };
 
   const getVarianceColor = (variancePercent: number | null) => {
     if (variancePercent === null) return 'text-muted-foreground';
     if (Math.abs(variancePercent) <= 5) return 'text-success';
-    return 'text-destructive';
+    return variancePercent > 0 ? 'text-warning' : 'text-destructive';
   };
 
   const rows = ingredients.map((ingredient) => {
@@ -97,7 +196,7 @@ export default function InventoryCount() {
   });
 
   const countedItems = rows.filter((r) => r.counted !== null).length;
-  const varianceItems = rows.filter((r) => r.status === 'variance').length;
+  const varianceItems = rows.filter((r) => r.status === 'overage' || r.status === 'shortage').length;
   const expectedTotalValue = ingredients.reduce(
     (sum, i) => sum + i.current_stock * i.unit_cost,
     0
@@ -201,7 +300,18 @@ export default function InventoryCount() {
                           <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-center">{getStatusIcon(status)}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {getStatusIcon(status)}
+                          {getStatusLabel(status) && (
+                            <span
+                              className={`text-xs font-corp-body ${status === 'overage' ? 'text-warning' : 'text-destructive'}`}
+                            >
+                              {getStatusLabel(status)}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -219,8 +329,8 @@ export default function InventoryCount() {
             <CardContent>
               <div className="space-y-3">
                 {rows
-                  .filter((r) => r.status === 'variance')
-                  .map(({ ingredient, counted, variancePercent }) => (
+                  .filter((r) => r.status === 'overage' || r.status === 'shortage')
+                  .map(({ ingredient, counted, variancePercent, status }) => (
                     <div
                       key={ingredient.id}
                       className="flex justify-between items-center p-3 bg-card rounded-md border border-border-regular"
@@ -232,8 +342,8 @@ export default function InventoryCount() {
                           {ingredient.unit}
                         </p>
                       </div>
-                      <Badge variant="destructive" className="text-sm">
-                        {variancePercent?.toFixed(1)}% diff
+                      <Badge variant={status === 'overage' ? 'secondary' : 'destructive'} className="text-sm">
+                        {getStatusLabel(status)} • {variancePercent?.toFixed(1)}%
                       </Badge>
                     </div>
                   ))}
@@ -252,6 +362,72 @@ export default function InventoryCount() {
           Save Inventory Count
         </Button>
       </div>
+
+      {/* Shrinkage follow-up prompt */}
+      <Dialog open={shrinkageDialogOpen} onOpenChange={setShrinkageDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="font-corp-display">Log Shortages as a Loss?</DialogTitle>
+            <DialogDescription>
+              This count came up short on {shrinkageItems.length} item{shrinkageItems.length === 1 ? '' : 's'}.
+              Optionally log each as a loss so the cost is tracked — this is never automatic, and skipping is fine.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {shrinkageItems.map((item) => (
+              <div
+                key={item.ingredientId}
+                className="flex items-center justify-between gap-3 p-3 bg-card rounded-md border border-border-regular"
+              >
+                <div className="min-w-0">
+                  <p className="font-corp-body font-semibold text-foreground">{item.ingredientName}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Short by {item.quantity} {item.unit}
+                  </p>
+                </div>
+                {item.logged ? (
+                  <Badge variant="secondary" className="text-xs shrink-0">
+                    Logged
+                  </Badge>
+                ) : (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Select
+                      value={item.reason}
+                      onValueChange={(v) => updateShrinkageReason(item.ingredientId, v as LossReason)}
+                    >
+                      <SelectTrigger className="w-40 h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SHRINKAGE_REASONS.map((r) => (
+                          <SelectItem key={r.value} value={r.value}>
+                            {r.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={loggingId === item.ingredientId}
+                      onClick={() => handleLogShrinkage(item)}
+                    >
+                      {loggingId === item.ingredientId ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        'Log Loss'
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <Button variant="ghost" onClick={() => setShrinkageDialogOpen(false)} className="w-full">
+            Done
+          </Button>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

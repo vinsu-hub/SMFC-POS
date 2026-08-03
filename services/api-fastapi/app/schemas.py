@@ -26,6 +26,7 @@ class Ingredient(BaseModel):
 
 class InventoryCountRequest(BaseModel):
     counted_stock: float
+    employee_id: str
 
 
 class TransactionItemRequest(BaseModel):
@@ -110,7 +111,7 @@ class DiscountTypeUpdate(BaseModel):
     active: bool | None = None
 
 
-LossReason = Literal["spoilage", "breakage", "comp", "prep_error"]
+LossReason = Literal["spoilage", "breakage", "comp", "prep_error", "shrinkage"]
 
 
 class CreateLossRecordRequest(BaseModel):
@@ -121,6 +122,8 @@ class CreateLossRecordRequest(BaseModel):
     reason: LossReason
     quantity: float
     photo_url: str | None = None
+    reference_id: str | None = None  # links to inventory_movements.id for count-driven shrinkage
+    skip_stock_deduction: bool = False  # set when stock was already adjusted by a count, avoids double-deducting
 
 
 class LossRecordResponse(BaseModel):
@@ -133,12 +136,13 @@ class LossRecordResponse(BaseModel):
     quantity: float
     cost_impact: float
     photo_url: str | None = None
+    reference_id: str | None = None
     created_at: datetime
 
 
 # --- Inventory Movements ---
 
-MovementType = Literal["trans_in", "trans_out", "delivery", "transfer_in", "transfer_out"]
+MovementType = Literal["trans_in", "trans_out", "delivery", "transfer_in", "transfer_out", "count_adjustment"]
 
 
 class InventoryMovementCreate(BaseModel):
@@ -162,7 +166,16 @@ class InventoryMovementResponse(BaseModel):
     reference_id: str | None = None
     employee_id: str
     unit_cost_snapshot: float | None = None
+    previous_stock: float | None = None
+    counted_stock: float | None = None
+    variance: float | None = None
     created_at: datetime
+
+
+class InventoryCountResponse(BaseModel):
+    ingredient: Ingredient
+    movement: InventoryMovementResponse | None = None
+    variance: float
 
 
 # --- Transfers ---
