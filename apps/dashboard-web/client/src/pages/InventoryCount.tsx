@@ -77,8 +77,8 @@ export default function InventoryCount() {
 
   const handleSubmit = async () => {
     const entries = Object.entries(countedValues).filter(([, v]) => v !== '' && !isNaN(parseFloat(v)));
-    if (entries.length < ingredients.length) {
-      toast.error(`Please count all items. ${ingredients.length - entries.length} remaining.`);
+    if (entries.length === 0) {
+      toast.error('Enter a counted value for at least one item first.');
       return;
     }
     if (!user?.id) {
@@ -298,6 +298,11 @@ export default function InventoryCount() {
                 </div>
                 <div className="pt-3 border-t border-border-regular space-y-2">
                   <p>
+                    <span className="font-semibold text-foreground">You don't have to count everything at once</span>{' '}
+                    — Save works as soon as at least one item has a counted value; anything left blank is simply
+                    skipped and stays untouched.
+                  </p>
+                  <p>
                     <span className="font-semibold text-foreground">When you save:</span> stock is set to exactly
                     what you counted. Any item that came out different from expected — overage or shortage — is
                     permanently logged as a <span className="font-corp-mono text-xs">Stock Count Adjustment</span> in{' '}
@@ -424,14 +429,22 @@ export default function InventoryCount() {
         )}
 
         {/* Submit Button */}
-        <Button
-          onClick={handleSubmit}
-          disabled={submitting || ingredients.length === 0 || countedItems < ingredients.length}
-          className="w-full font-corp-display py-6"
-        >
-          {submitting ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
-          Save Inventory Count
-        </Button>
+        <div className="space-y-1.5">
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting || ingredients.length === 0 || countedItems === 0}
+            className="w-full font-corp-display py-6"
+          >
+            {submitting ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
+            Save Inventory Count
+          </Button>
+          {countedItems > 0 && countedItems < ingredients.length && (
+            <p className="text-xs text-muted-foreground font-corp-body text-center">
+              Only the {countedItems} item{countedItems === 1 ? '' : 's'} you've entered will be saved — the rest
+              are left as-is, you don't need to count everything at once.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Shrinkage follow-up prompt */}
