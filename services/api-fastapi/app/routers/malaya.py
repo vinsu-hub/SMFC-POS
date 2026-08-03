@@ -74,6 +74,17 @@ don't guess from the wrong one:
   threshold, worst shortage first, capped at 15 rows — use for "what needs
   restocking" questions. low_stock_count is the true total even if the list
   is capped.
+- stock_movement_activity.pending_stock_requests: inter-branch stock
+  requests that are still pending (not yet fulfilled or declined),
+  capped at 15, most recent first — use for "what's pending between
+  branches" / "what has X requested" / "what am I waiting on" questions.
+  requesting_branch is who asked, source_branch is who'd send it.
+- stock_movement_activity.recent_transfers: recent inter-branch stock
+  transfers (any status: pending, confirmed, rejected), capped at 15,
+  most recent first — use for "what's been sent/received between
+  branches" / "did branch X send that stock yet" questions. Check
+  `status` before answering — pending means it hasn't been confirmed by
+  the receiving branch yet.
 """
 
 
@@ -369,6 +380,85 @@ def _inventory_analysis(supabase, branch_ids: list[str], low_stock_limit: int = 
     }
 
 
+def _stock_movement_activity(supabase, branch_ids: list[str], known_branch_names: dict[str, str]) -> dict:
+    """Pending inter-branch stock requests + recent transfers involving this
+    scope (either side) — same either-side-OR pattern list_stock_requests/
+    list_transfers already use, generalized from one branch to the full
+    branch_ids list so it covers both a manager's single branch and an
+    executive's org-wide scope in one query.
+
+    known_branch_names is seeded from the caller's own branches list, which
+    for a manager only contains their own branch -- the other side of a
+    cross-branch row is very often NOT in that list, so any unresolved ids
+    get one extra lookup here rather than leaking raw uuids to the LLM.
+    """
+    if not branch_ids:
+        return {"pending_stock_requests": [], "recent_transfers": []}
+
+    branch_filter = ",".join(branch_ids)
+
+    requests_result = (
+        supabase.table("stock_requests")
+        .select("requesting_branch_id, source_branch_id, ingredient_id, quantity, requested_by, created_at")
+        .or_(f"requesting_branch_id.in.({branch_filter}),source_branch_id.in.({branch_filter})")
+        .eq("status", "pending")
+        .order("created_at", desc=True)
+        .limit(15)
+        .execute()
+    )
+    transfers_result = (
+        supabase.table("transfers")
+        .select("from_branch_id, to_branch_id, ingredient_id, quantity, status, initiated_at")
+        .or_(f"from_branch_id.in.({branch_filter}),to_branch_id.in.({branch_filter})")
+        .order("initiated_at", desc=True)
+        .limit(15)
+        .execute()
+    )
+
+    unresolved_branch_ids = set()
+    for r in requests_result.data:
+        unresolved_branch_ids.add(r["requesting_branch_id"])
+        unresolved_branch_ids.add(r["source_branch_id"])
+    for t in transfers_result.data:
+        unresolved_branch_ids.add(t["from_branch_id"])
+        unresolved_branch_ids.add(t["to_branch_id"])
+    unresolved_branch_ids -= set(known_branch_names.keys())
+    if unresolved_branch_ids:
+        extra_branches = supabase.table("branches").select("id, name").in_("id", list(unresolved_branch_ids)).execute()
+        for b in extra_branches.data:
+            known_branch_names[b["id"]] = b["name"]
+
+    ingredient_ids = {r["ingredient_id"] for r in requests_result.data} | {t["ingredient_id"] for t in transfers_result.data}
+    ingredient_names: dict[str, str] = {}
+    if ingredient_ids:
+        ingredients_result = supabase.table("ingredients").select("id, name").in_("id", list(ingredient_ids)).execute()
+        ingredient_names = {i["id"]: i["name"] for i in ingredients_result.data}
+
+    pending_stock_requests = [
+        {
+            "requesting_branch": known_branch_names.get(r["requesting_branch_id"], "Unknown"),
+            "source_branch": known_branch_names.get(r["source_branch_id"], "Unknown"),
+            "ingredient": ingredient_names.get(r["ingredient_id"], "Unknown"),
+            "quantity": r["quantity"],
+            "requested_at": r["created_at"],
+        }
+        for r in requests_result.data
+    ]
+    recent_transfers = [
+        {
+            "from_branch": known_branch_names.get(t["from_branch_id"], "Unknown"),
+            "to_branch": known_branch_names.get(t["to_branch_id"], "Unknown"),
+            "ingredient": ingredient_names.get(t["ingredient_id"], "Unknown"),
+            "quantity": t["quantity"],
+            "status": t["status"],
+            "initiated_at": t["initiated_at"],
+        }
+        for t in transfers_result.data
+    ]
+
+    return {"pending_stock_requests": pending_stock_requests, "recent_transfers": recent_transfers}
+
+
 @router.post("/malaya/query", response_model=MalayaQueryResponse)
 def query_malaya(body: MalayaQueryRequest, user: CurrentUser = Depends(get_current_user)):
     if user.role == "employee":
@@ -404,6 +494,9 @@ def query_malaya(body: MalayaQueryRequest, user: CurrentUser = Depends(get_curre
         "payroll_analysis": _payroll_analysis(supabase, branch_ids),
         "sales_trend_30d": _sales_trend(supabase, branch_ids),
         "inventory_analysis": _inventory_analysis(supabase, branch_ids),
+        "stock_movement_activity": _stock_movement_activity(
+            supabase, branch_ids, {b["id"]: b["name"] for b in branches}
+        ),
     }
 
     client = Groq(api_key=api_key)

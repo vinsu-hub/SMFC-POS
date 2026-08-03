@@ -35,15 +35,15 @@ import {
   ApiStockRequest,
 } from '@/lib/api';
 
-// The manual "create movement" dialog's type picker — deliberately excludes
-// transfer_in (only ever produced by confirming a transfer) and
-// count_adjustment (only ever produced by Count Stock), neither of which
-// should be hand-created here.
+// The manual "create movement" dialog's type picker — same-branch, instant,
+// final actions only. Deliberately excludes transfer_out (cross-branch,
+// needs the other branch to confirm -- has its own dedicated dialog, see
+// "Send Stock" below), transfer_in (only ever produced by confirming a
+// transfer), and count_adjustment (only ever produced by Count Stock).
 const MOVEMENT_TYPES: { value: MovementType; label: string; icon: React.ReactNode; color: string }[] = [
   { value: 'trans_in', label: 'Receive Stock', icon: <ArrowDownLeft className="w-4 h-4" />, color: 'bg-success-bg text-success' },
   { value: 'trans_out', label: 'Remove Stock', icon: <ArrowUpRight className="w-4 h-4" />, color: 'bg-error-bg text-destructive' },
   { value: 'delivery', label: 'Delivery', icon: <Truck className="w-4 h-4" />, color: 'bg-warning-bg text-warning' },
-  { value: 'transfer_out', label: 'Transfer Out', icon: <Send className="w-4 h-4" />, color: 'bg-accent-soft text-accent-foreground' },
 ];
 
 // Full display config for every movement type, used by Recent Movements —
@@ -99,8 +99,19 @@ export default function InventoryMovements() {
     ingredientId: '',
     quantity: '',
     reason: '',
-    toBranchId: '',
     unitCost: '',
+  });
+
+  // Send Stock dialog - own dialog rather than folded into the generic
+  // movement dialog, since it's cross-branch (needs the other branch to
+  // confirm) unlike Receive/Remove/Delivery, which are same-branch and final.
+  const [sendStockDialogOpen, setSendStockDialogOpen] = useState(false);
+  const [sendSubmitting, setSendSubmitting] = useState(false);
+  const [sendForm, setSendForm] = useState({
+    toBranchId: '',
+    ingredientId: '',
+    quantity: '',
+    notes: '',
   });
 
   // Request Stock dialog - separate ingredient list scoped to the chosen
@@ -150,34 +161,19 @@ export default function InventoryMovements() {
       toast.error('Please select an ingredient and enter quantity');
       return;
     }
-    if (selectedType === 'transfer_out' && !form.toBranchId) {
-      toast.error('Select a destination branch');
-      return;
-    }
     setSubmitting(true);
     try {
-      if (selectedType === 'transfer_out') {
-        await createTransfer({
-          from_branch_id: user.branchId!,
-          to_branch_id: form.toBranchId,
-          ingredient_id: form.ingredientId,
-          quantity: parseFloat(form.quantity),
-          initiated_by: user.id,
-          notes: form.reason || undefined,
-        });
-      } else {
-        await createInventoryMovement({
-          branch_id: user.branchId!,
-          ingredient_id: form.ingredientId,
-          type: selectedType,
-          quantity: parseFloat(form.quantity),
-          reason: form.reason || undefined,
-          employee_id: user.id,
-          unit_cost: selectedType === 'delivery' && form.unitCost ? parseFloat(form.unitCost) : undefined,
-        });
-      }
+      await createInventoryMovement({
+        branch_id: user.branchId!,
+        ingredient_id: form.ingredientId,
+        type: selectedType,
+        quantity: parseFloat(form.quantity),
+        reason: form.reason || undefined,
+        employee_id: user.id,
+        unit_cost: selectedType === 'delivery' && form.unitCost ? parseFloat(form.unitCost) : undefined,
+      });
       toast.success('Movement recorded');
-      setForm({ ingredientId: '', quantity: '', reason: '', toBranchId: '', unitCost: '' });
+      setForm({ ingredientId: '', quantity: '', reason: '', unitCost: '' });
       setDialogOpen(false);
       loadData();
     } catch (error) {
@@ -187,9 +183,36 @@ export default function InventoryMovements() {
     }
   };
 
+  const handleSubmitSendStock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sendForm.toBranchId || !sendForm.ingredientId || !sendForm.quantity) {
+      toast.error('Select a destination branch, an ingredient, and enter quantity');
+      return;
+    }
+    setSendSubmitting(true);
+    try {
+      await createTransfer({
+        from_branch_id: user.branchId!,
+        to_branch_id: sendForm.toBranchId,
+        ingredient_id: sendForm.ingredientId,
+        quantity: parseFloat(sendForm.quantity),
+        initiated_by: user.id,
+        notes: sendForm.notes || undefined,
+      });
+      toast.success('Stock sent — the destination branch needs to confirm receipt');
+      setSendForm({ toBranchId: '', ingredientId: '', quantity: '', notes: '' });
+      setSendStockDialogOpen(false);
+      loadData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to send stock');
+    } finally {
+      setSendSubmitting(false);
+    }
+  };
+
   const handleOpenDialog = (type: MovementType) => {
     setSelectedType(type);
-    setForm({ ingredientId: '', quantity: '', reason: '', toBranchId: '', unitCost: '' });
+    setForm({ ingredientId: '', quantity: '', reason: '', unitCost: '' });
     setDialogOpen(true);
   };
 
@@ -347,26 +370,47 @@ export default function InventoryMovements() {
         {/* Action Buttons */}
         <Card>
           <CardContent className="p-4">
-            <div className="flex flex-wrap gap-3">
-              {MOVEMENT_TYPES.map((type) => (
-                <Button
-                  key={type.value}
-                  variant="outline"
-                  onClick={() => handleOpenDialog(type.value)}
-                  className="gap-2"
-                >
-                  {type.icon}
-                  <span className="font-corp-body">{type.label}</span>
-                </Button>
-              ))}
-              <Button
-                variant="outline"
-                onClick={handleOpenRequestDialog}
-                className="gap-2"
-              >
-                <PackagePlus className="w-4 h-4" />
-                <span className="font-corp-body">Request Stock</span>
-              </Button>
+            <div className="flex flex-wrap items-start gap-4">
+              <div className="flex flex-wrap gap-3">
+                {MOVEMENT_TYPES.map((type) => (
+                  <Button
+                    key={type.value}
+                    variant="outline"
+                    onClick={() => handleOpenDialog(type.value)}
+                    className="gap-2"
+                  >
+                    {type.icon}
+                    <span className="font-corp-body">{type.label}</span>
+                  </Button>
+                ))}
+              </div>
+
+              <div className="w-px self-stretch bg-border-regular hidden sm:block" />
+
+              <div className="flex flex-col gap-1.5">
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setSendStockDialogOpen(true)}
+                    className="gap-2"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span className="font-corp-body">Send Stock</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleOpenRequestDialog}
+                    className="gap-2"
+                  >
+                    <PackagePlus className="w-4 h-4" />
+                    <span className="font-corp-body">Request Stock</span>
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground font-corp-body">
+                  Between branches — the other branch must confirm
+                </p>
+              </div>
+
               <Button
                 variant="outline"
                 onClick={loadData}
@@ -407,23 +451,6 @@ export default function InventoryMovements() {
                   </SelectContent>
                 </Select>
               </div>
-              {selectedType === 'transfer_out' && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground font-corp-body">Destination Branch</label>
-                  <Select value={form.toBranchId} onValueChange={v => setForm({ ...form, toBranchId: v })}>
-                    <SelectTrigger className="font-corp-body">
-                      <SelectValue placeholder="Select destination branch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {otherBranches.map((b) => (
-                        <SelectItem key={b.id} value={b.id}>
-                          {b.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground font-corp-body">Quantity</label>
                 <Input
@@ -455,7 +482,7 @@ export default function InventoryMovements() {
                 <Input
                   value={form.reason}
                   onChange={e => setForm({ ...form, reason: e.target.value })}
-                  placeholder="Supplier, transfer note, etc."
+                  placeholder="Supplier, note, etc."
                   className="font-corp-body"
                 />
               </div>
@@ -466,6 +493,81 @@ export default function InventoryMovements() {
                 <Button type="submit" disabled={submitting} className="flex-1">
                   {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                   Record {getMovementLabel(selectedType)}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Send Stock Dialog */}
+        <Dialog open={sendStockDialogOpen} onOpenChange={setSendStockDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-corp-display">Send Stock</DialogTitle>
+              <DialogDescription className="font-corp-body">
+                Send stock directly to another branch. It leaves your inventory immediately — they'll see it under
+                Incoming Transfers and need to confirm before it's added to theirs.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmitSendStock} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground font-corp-body">Destination Branch</label>
+                <Select value={sendForm.toBranchId} onValueChange={v => setSendForm({ ...sendForm, toBranchId: v })}>
+                  <SelectTrigger className="font-corp-body">
+                    <SelectValue placeholder="Select destination branch" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {otherBranches.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground font-corp-body">Ingredient</label>
+                <Select value={sendForm.ingredientId} onValueChange={v => setSendForm({ ...sendForm, ingredientId: v })}>
+                  <SelectTrigger className="font-corp-body">
+                    <SelectValue placeholder="Select ingredient" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ingredients.map((ing) => (
+                      <SelectItem key={ing.id} value={ing.id}>
+                        {ing.name} ({ing.current_stock} {ing.unit})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground font-corp-body">Quantity</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={sendForm.quantity}
+                  onChange={e => setSendForm({ ...sendForm, quantity: e.target.value })}
+                  placeholder="Enter quantity"
+                  className="font-corp-body font-corp-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground font-corp-body">Notes (optional)</label>
+                <Input
+                  value={sendForm.notes}
+                  onChange={e => setSendForm({ ...sendForm, notes: e.target.value })}
+                  placeholder="Why it's being sent, etc."
+                  className="font-corp-body"
+                />
+              </div>
+              <div className="flex gap-3 pt-4">
+                <Button type="button" variant="outline" onClick={() => setSendStockDialogOpen(false)} className="flex-1">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={sendSubmitting} className="flex-1">
+                  {sendSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                  Send Stock
                 </Button>
               </div>
             </form>
