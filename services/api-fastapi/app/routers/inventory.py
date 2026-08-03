@@ -9,7 +9,13 @@ router = APIRouter(tags=["inventory"])
 
 @router.get("/inventory", response_model=list[Ingredient])
 def list_inventory(branch_id: str = Query(...), user: CurrentUser = Depends(get_current_user)):
-    require_branch_access(user, branch_id)
+    """Any authenticated branch-scoped user can read another branch's
+    ingredient list (not just their own) -- required for Request Stock's
+    source-branch picker (InventoryMovements.tsx), which needs to show what
+    a different branch actually has before a request can name a real
+    ingredient. Being logged in is the bar here, not require_branch_access,
+    which would otherwise 403 exactly that legitimate cross-branch read.
+    """
     supabase = get_supabase()
     result = supabase.table("ingredients").select("*").eq("branch_id", branch_id).execute()
     return result.data
