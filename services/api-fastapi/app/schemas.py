@@ -4,6 +4,9 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field, model_validator
 
 
+KitchenStation = Literal["grill", "fryer", "bar", "coffee", "dessert"]
+
+
 class Product(BaseModel):
     id: str
     branch_id: str
@@ -11,6 +14,12 @@ class Product(BaseModel):
     category: str
     price: float
     active: bool
+    station: KitchenStation | None = None
+    needs_station_review: bool = False
+    needs_pricing: bool = False
+    image_path: str | None = None
+    image_url: str | None = None
+    availability: Literal["available", "low_stock", "unavailable"] = "available"
 
 
 class Ingredient(BaseModel):
@@ -29,9 +38,14 @@ class InventoryCountRequest(BaseModel):
     employee_id: str
 
 
+KitchenStatus = Literal["queued", "preparing", "ready", "completed"]
+OrderType = Literal["dine_in", "take_out"]
+
+
 class TransactionItemRequest(BaseModel):
     product_id: str
     quantity: float
+    note: str | None = None
 
 
 class CreateTransactionRequest(BaseModel):
@@ -43,6 +57,9 @@ class CreateTransactionRequest(BaseModel):
     owner_request_employee_number: str | None = None
     owner_request_pin: str | None = None
     owner_request_note: str | None = None
+    order_type: OrderType = "dine_in"
+    table_number: str | None = None
+    guest_count: int | None = None
 
 
 class TransactionItemResponse(BaseModel):
@@ -51,11 +68,13 @@ class TransactionItemResponse(BaseModel):
     quantity: float
     unit_price: float
     held_ingredient_ids: list[str] = []
+    note: str | None = None
 
 
 class UpdateTransactionItemRequest(BaseModel):
     quantity: float | None = None
     held_ingredient_ids: list[str] | None = None
+    note: str | None = None
 
 
 class TransactionResponse(BaseModel):
@@ -77,11 +96,36 @@ class TransactionResponse(BaseModel):
     void_reason: str | None = None
     fulfilled: bool = False
     fulfilled_at: datetime | None = None
+    kitchen_status: KitchenStatus = "queued"
+    kitchen_status_updated_at: datetime | None = None
+    order_type: OrderType = "dine_in"
+    table_number: str | None = None
+    guest_count: int | None = None
     items: list[TransactionItemResponse]
 
 
 class VoidTransactionRequest(BaseModel):
     reason: str | None = None
+
+
+class KitchenStatusUpdateRequest(BaseModel):
+    kitchen_status: KitchenStatus
+
+
+class KitchenSummaryResponse(BaseModel):
+    """Powers both Order Queue's "Today's Overview" cards and Kitchen
+    Display's stat cards -- one computation, two consumers, so the two
+    pages can never disagree about a count.
+    """
+    queued_count: int
+    preparing_count: int
+    ready_count: int
+    completed_today_count: int
+    delayed_count: int
+    owner_request_pending_count: int
+    avg_prep_time_seconds: float | None = None
+    longest_order_id: str | None = None
+    longest_order_elapsed_seconds: float | None = None
 
 
 # --- Discounts ---

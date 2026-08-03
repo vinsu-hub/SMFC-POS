@@ -26,6 +26,7 @@ import {
   ListOrdered,
   Percent,
   CalendarDays,
+  ChefHat,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -55,6 +56,7 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
       ? [
           { icon: ShoppingCart, label: 'POS Terminal', href: '/pos', show: true },
           { icon: ListOrdered, label: 'Order Queue', href: '/order-queue', show: true },
+          { icon: ChefHat, label: 'Kitchen Display', href: '/kitchen-display', show: true },
           { icon: Package, label: 'Count Stock', href: '/inventory-count', show: true },
           { icon: AlertCircle, label: 'Log Loss', href: '/loss-log', show: true },
           { icon: Truck, label: 'Inventory Movements', href: '/inventory-movements', show: true },

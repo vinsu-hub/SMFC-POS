@@ -6,6 +6,8 @@ from app.auth import CurrentUser, get_current_user, require_branch_access, verif
 from app.deps import get_supabase
 from app.schemas import (
     CreateTransactionRequest,
+    KitchenStatusUpdateRequest,
+    KitchenSummaryResponse,
     TransactionResponse,
     UpdateTransactionItemRequest,
     VoidTransactionRequest,
@@ -14,6 +16,13 @@ from app.schemas import (
 router = APIRouter(tags=["transactions"])
 
 VAT_RATE = 0.12
+
+KITCHEN_STATUS_ORDER = ["queued", "preparing", "ready", "completed"]
+# Elapsed time (seconds) in the current state before it counts as "delayed"
+# on Kitchen Display / Order Queue. Hardcoded for v1 -- a per-branch
+# settings surface for these is a reasonable future addition, not required
+# now.
+DELAYED_THRESHOLD_SECONDS = {"queued": 15 * 60, "preparing": 15 * 60, "ready": 10 * 60}
 
 
 @router.post("/transactions", response_model=TransactionResponse)
@@ -91,6 +100,9 @@ def create_transaction(body: CreateTransactionRequest, user: CurrentUser = Depen
                 "is_owner_request": body.is_owner_request,
                 "owner_request_by": owner_request_by,
                 "owner_request_note": body.owner_request_note,
+                "order_type": body.order_type,
+                "table_number": body.table_number,
+                "guest_count": body.guest_count,
             }
         )
         .execute()
@@ -110,6 +122,7 @@ def create_transaction(body: CreateTransactionRequest, user: CurrentUser = Depen
                 "product_id": item.product_id,
                 "quantity": item.quantity,
                 "unit_price": unit_price,
+                "note": item.note,
             }
         )
 
@@ -312,6 +325,55 @@ def void_transaction(
     return TransactionResponse(**updated.data[0], items=transaction["items"])
 
 
+def _set_kitchen_status(supabase, transaction: dict, new_status: str, user: CurrentUser, allow_skip: bool) -> dict:
+    require_branch_access(user, transaction["branch_id"])
+    if user.role == "employee" and transaction["employee_id"] != user.id:
+        raise HTTPException(status_code=403, detail="Employees may only update their own orders")
+    if transaction["status"] == "voided":
+        raise HTTPException(status_code=400, detail="Cannot update a voided order")
+
+    current = transaction.get("kitchen_status", "queued")
+    if new_status == current:
+        raise HTTPException(status_code=400, detail=f"Order is already {new_status}")
+
+    if not allow_skip:
+        current_index = KITCHEN_STATUS_ORDER.index(current)
+        new_index = KITCHEN_STATUS_ORDER.index(new_status)
+        if new_index != current_index + 1:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot move directly from {current} to {new_status}",
+            )
+
+    updated = (
+        supabase.table("transactions")
+        .update({"kitchen_status": new_status, "kitchen_status_updated_at": datetime.now(timezone.utc).isoformat()})
+        .eq("id", transaction["id"])
+        .execute()
+    )
+    return updated.data[0]
+
+
+@router.patch("/transactions/{transaction_id}/kitchen-status", response_model=TransactionResponse)
+def update_kitchen_status(
+    transaction_id: str,
+    body: KitchenStatusUpdateRequest,
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Drives Kitchen Display's per-column buttons (Accept/Mark as Ready/
+    Ready for Pickup) — strict single forward step only, 400 on an invalid
+    jump. Order Queue's "Mark as Done" uses /fulfill below instead, which
+    allows jumping straight to completed from any state (front-of-house may
+    close out an order without ever touching Kitchen Display that shift)."""
+    supabase = get_supabase()
+    transaction = _fetch_transaction_with_items(supabase, transaction_id)
+    if not transaction:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    updated = _set_kitchen_status(supabase, transaction, body.kitchen_status, user, allow_skip=False)
+    return TransactionResponse(**updated, items=transaction["items"])
+
+
 @router.post("/transactions/{transaction_id}/fulfill", response_model=TransactionResponse)
 def fulfill_transaction(
     transaction_id: str,
@@ -319,28 +381,99 @@ def fulfill_transaction(
 ):
     """Marks an order done (served/handed off) - separate from payment
     status (open/closed/voided). This is what removes it from the active
-    Order Queue view on the frontend. Same permission rule as void/edit."""
+    Order Queue view. Sets kitchen_status='completed' directly (allowed to
+    skip queued/preparing/ready) since front-of-house may close an order
+    out without the kitchen ever having tracked it through those states.
+    fulfilled/fulfilled_at are no longer written here — kitchen_status is
+    the single source of truth going forward."""
     supabase = get_supabase()
 
     transaction = _fetch_transaction_with_items(supabase, transaction_id)
     if not transaction:
         raise HTTPException(status_code=404, detail="Transaction not found")
 
-    require_branch_access(user, transaction["branch_id"])
-    if user.role == "employee" and transaction["employee_id"] != user.id:
-        raise HTTPException(status_code=403, detail="Employees may only complete their own orders")
-    if transaction["status"] == "voided":
-        raise HTTPException(status_code=400, detail="Cannot complete a voided order")
-    if transaction["fulfilled"]:
-        raise HTTPException(status_code=400, detail="Order is already marked done")
+    updated = _set_kitchen_status(supabase, transaction, "completed", user, allow_skip=True)
+    return TransactionResponse(**updated, items=transaction["items"])
 
-    updated = (
+
+@router.get("/branches/{branch_id}/kitchen-summary", response_model=KitchenSummaryResponse)
+def get_kitchen_summary(branch_id: str, user: CurrentUser = Depends(get_current_user)):
+    """One computation, consumed by both Order Queue's "Today's Overview"
+    cards and Kitchen Display's stat cards, so the two pages can never
+    disagree about a count."""
+    require_branch_access(user, branch_id)
+    supabase = get_supabase()
+
+    now = datetime.now(timezone.utc)
+    today_start = datetime.combine(now.date(), datetime.min.time(), tzinfo=timezone.utc)
+
+    active_result = (
         supabase.table("transactions")
-        .update({"fulfilled": True, "fulfilled_at": datetime.now(timezone.utc).isoformat()})
-        .eq("id", transaction_id)
+        .select("id, kitchen_status, kitchen_status_updated_at, opened_at, is_owner_request")
+        .eq("branch_id", branch_id)
+        .neq("status", "voided")
+        .neq("kitchen_status", "completed")
         .execute()
     )
-    return TransactionResponse(**updated.data[0], items=transaction["items"])
+    active = active_result.data
+
+    completed_today_result = (
+        supabase.table("transactions")
+        .select("id, kitchen_status_updated_at, opened_at")
+        .eq("branch_id", branch_id)
+        .eq("kitchen_status", "completed")
+        .gte("kitchen_status_updated_at", today_start.isoformat())
+        .execute()
+    )
+    completed_today = completed_today_result.data
+
+    owner_request_result = (
+        supabase.table("transactions")
+        .select("id", count="exact")
+        .eq("branch_id", branch_id)
+        .eq("is_owner_request", True)
+        .neq("status", "voided")
+        .neq("kitchen_status", "completed")
+        .execute()
+    )
+
+    counts = {"queued": 0, "preparing": 0, "ready": 0}
+    delayed_count = 0
+    longest_order_id = None
+    longest_order_elapsed = -1.0
+
+    for t in active:
+        status = t["kitchen_status"]
+        counts[status] = counts.get(status, 0) + 1
+
+        state_elapsed = (now - datetime.fromisoformat(t["kitchen_status_updated_at"])).total_seconds()
+        if state_elapsed > DELAYED_THRESHOLD_SECONDS.get(status, float("inf")):
+            delayed_count += 1
+
+        opened_elapsed = (now - datetime.fromisoformat(t["opened_at"])).total_seconds()
+        if opened_elapsed > longest_order_elapsed:
+            longest_order_elapsed = opened_elapsed
+            longest_order_id = t["id"]
+
+    avg_prep_time_seconds = None
+    if completed_today:
+        durations = [
+            (datetime.fromisoformat(t["kitchen_status_updated_at"]) - datetime.fromisoformat(t["opened_at"])).total_seconds()
+            for t in completed_today
+        ]
+        avg_prep_time_seconds = sum(durations) / len(durations)
+
+    return KitchenSummaryResponse(
+        queued_count=counts["queued"],
+        preparing_count=counts["preparing"],
+        ready_count=counts["ready"],
+        completed_today_count=len(completed_today),
+        delayed_count=delayed_count,
+        owner_request_pending_count=owner_request_result.count or 0,
+        avg_prep_time_seconds=avg_prep_time_seconds,
+        longest_order_id=longest_order_id,
+        longest_order_elapsed_seconds=longest_order_elapsed if longest_order_id else None,
+    )
 
 
 def _effective_consumption(supabase, product_id: str, quantity: float, held_ingredient_ids: list[str]) -> dict:
@@ -390,6 +523,7 @@ def update_transaction_item(
     old_held = item.get("held_ingredient_ids") or []
     new_quantity = body.quantity if body.quantity is not None else old_quantity
     new_held = body.held_ingredient_ids if body.held_ingredient_ids is not None else old_held
+    new_note = body.note if body.note is not None else item.get("note")
 
     if new_quantity <= 0:
         raise HTTPException(status_code=400, detail="Quantity must be greater than zero")
@@ -440,7 +574,7 @@ def update_transaction_item(
             ).execute()
 
     supabase.table("transaction_items").update(
-        {"quantity": new_quantity, "held_ingredient_ids": new_held}
+        {"quantity": new_quantity, "held_ingredient_ids": new_held, "note": new_note}
     ).eq("id", item_id).execute()
 
     # Recompute the transaction's totals from all its items, same formula create_transaction uses.

@@ -2,6 +2,9 @@ import { supabase } from '@/lib/supabaseClient';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
 
+export type KitchenStation = 'grill' | 'fryer' | 'bar' | 'coffee' | 'dessert';
+export type ProductAvailability = 'available' | 'low_stock' | 'unavailable';
+
 export interface ApiProduct {
   id: string;
   branch_id: string;
@@ -9,12 +12,22 @@ export interface ApiProduct {
   category: string;
   price: number;
   active: boolean;
+  station: KitchenStation | null;
+  needs_station_review: boolean;
+  needs_pricing: boolean;
+  image_path: string | null;
+  image_url: string | null;
+  availability: ProductAvailability;
 }
 
 export interface CreateTransactionItem {
   product_id: string;
   quantity: number;
+  note?: string | null;
 }
+
+export type KitchenStatus = 'queued' | 'preparing' | 'ready' | 'completed';
+export type OrderType = 'dine_in' | 'take_out';
 
 export interface ApiTransaction {
   id: string;
@@ -35,12 +48,37 @@ export interface ApiTransaction {
   void_reason: string | null;
   fulfilled: boolean;
   fulfilled_at: string | null;
-  items: { id: string; product_id: string; quantity: number; unit_price: number; held_ingredient_ids: string[] }[];
+  kitchen_status: KitchenStatus;
+  kitchen_status_updated_at: string | null;
+  order_type: OrderType;
+  table_number: string | null;
+  guest_count: number | null;
+  items: {
+    id: string;
+    product_id: string;
+    quantity: number;
+    unit_price: number;
+    held_ingredient_ids: string[];
+    note: string | null;
+  }[];
 }
 
 export interface UpdateTransactionItemRequest {
   quantity?: number;
   held_ingredient_ids?: string[];
+  note?: string | null;
+}
+
+export interface ApiKitchenSummary {
+  queued_count: number;
+  preparing_count: number;
+  ready_count: number;
+  completed_today_count: number;
+  delayed_count: number;
+  owner_request_pending_count: number;
+  avg_prep_time_seconds: number | null;
+  longest_order_id: string | null;
+  longest_order_elapsed_seconds: number | null;
 }
 
 export interface ApiRecipeItem {
@@ -55,6 +93,9 @@ export interface CreateTransactionOptions {
   owner_request_employee_number?: string;
   owner_request_pin?: string;
   owner_request_note?: string;
+  order_type?: OrderType;
+  table_number?: string | null;
+  guest_count?: number | null;
 }
 
 export interface ApiDiscountType {
@@ -540,6 +581,17 @@ export function createTransaction(
 
 export function closeTransaction(transactionId: string): Promise<ApiTransaction> {
   return request(`/transactions/${transactionId}/close`, { method: 'POST' });
+}
+
+export function updateKitchenStatus(transactionId: string, kitchenStatus: KitchenStatus): Promise<ApiTransaction> {
+  return request(`/transactions/${transactionId}/kitchen-status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ kitchen_status: kitchenStatus }),
+  });
+}
+
+export function fetchKitchenSummary(branchId: string): Promise<ApiKitchenSummary> {
+  return request(`/branches/${branchId}/kitchen-summary`);
 }
 
 export function fetchTransactions(branchId: string, date?: string): Promise<ApiTransaction[]> {
