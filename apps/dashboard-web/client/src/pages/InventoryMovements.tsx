@@ -577,10 +577,10 @@ export default function InventoryMovements() {
                           <TableCell className="text-sm font-corp-mono">{new Date(t.initiated_at).toLocaleString()}</TableCell>
                           <TableCell>
                             <div className="flex gap-2">
-                              <Button size="sm" variant="default" onClick={() => handleConfirmTransfer(t.id)} className="text-success">
+                              <Button size="sm" variant="default" onClick={() => handleConfirmTransfer(t.id)}>
                                 <RefreshCw className="w-3 h-3 mr-1" /> Receive
                               </Button>
-                              <Button size="sm" variant="destructive" onClick={() => handleRejectTransfer(t.id)} className="text-destructive">
+                              <Button size="sm" variant="destructive" onClick={() => handleRejectTransfer(t.id)}>
                                 <AlertCircle className="w-3 h-3 mr-1" /> Reject
                               </Button>
                             </div>
@@ -621,10 +621,10 @@ export default function InventoryMovements() {
                         <TableCell className="text-sm text-muted-foreground">{r.requested_by_name ?? '—'}</TableCell>
                         <TableCell>
                           <div className="flex gap-2">
-                            <Button size="sm" variant="default" onClick={() => handleFulfillRequest(r.id)} className="text-success">
+                            <Button size="sm" variant="default" onClick={() => handleFulfillRequest(r.id)}>
                               <CheckCircle2 className="w-3 h-3 mr-1" /> Convert to Transfer
                             </Button>
-                            <Button size="sm" variant="destructive" onClick={() => handleDeclineRequest(r.id)} className="text-destructive">
+                            <Button size="sm" variant="destructive" onClick={() => handleDeclineRequest(r.id)}>
                               <AlertCircle className="w-3 h-3 mr-1" /> Decline
                             </Button>
                           </div>

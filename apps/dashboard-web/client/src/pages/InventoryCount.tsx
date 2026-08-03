@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertCircle, CheckCircle, Loader2, Package, TrendingDown, TrendingUp } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { AlertCircle, CheckCircle, ChevronDown, HelpCircle, Loader2, Package, TrendingDown, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 import {
@@ -57,6 +58,7 @@ export default function InventoryCount() {
   const [shrinkageDialogOpen, setShrinkageDialogOpen] = useState(false);
   const [shrinkageItems, setShrinkageItems] = useState<ShrinkageItem[]>([]);
   const [loggingId, setLoggingId] = useState<string | null>(null);
+  const [howItWorksOpen, setHowItWorksOpen] = useState(true);
 
   const loadInventory = () => {
     if (!user?.branchId) return;
@@ -244,6 +246,75 @@ export default function InventoryCount() {
             </CardContent>
           </Card>
         </div>
+
+        {/* How It Works */}
+        <Collapsible open={howItWorksOpen} onOpenChange={setHowItWorksOpen}>
+          <Card className="border-l-4 border-l-accent-soft bg-accent-soft/30">
+            <CollapsibleTrigger asChild>
+              <button className="w-full text-left" type="button">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 py-4">
+                  <div className="flex items-center gap-2">
+                    <HelpCircle className="w-4 h-4 text-muted-foreground" />
+                    <CardTitle className="font-corp-display text-base">How Stock Counting Works</CardTitle>
+                  </div>
+                  <ChevronDown
+                    className={`w-4 h-4 text-muted-foreground transition-transform ${howItWorksOpen ? 'rotate-180' : ''}`}
+                  />
+                </CardHeader>
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="pt-0 space-y-4 text-sm font-corp-body">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex gap-2">
+                    <span className="font-corp-display font-semibold text-muted-foreground">1.</span>
+                    <p>
+                      <span className="font-semibold text-foreground">Expected</span> is what the system currently
+                      thinks you have on the shelf. <span className="font-semibold text-foreground">Counted</span>{' '}
+                      is what you physically count and type in.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <span className="font-corp-display font-semibold text-muted-foreground">2.</span>
+                    <p>
+                      <span className="font-semibold text-foreground">Variance</span> = Counted − Expected. Within
+                      5% is treated as normal counting noise and shown in green — nothing to worry about.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <TrendingUp className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+                    <p>
+                      <span className="font-semibold text-warning">Overage</span> — you counted more than expected.
+                      Often a past miscount or an uncounted delivery; worth a second look, not urgent.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <TrendingDown className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                    <p>
+                      <span className="font-semibold text-destructive">Shortage</span> — you counted less than
+                      expected. Could be real loss (spoilage, theft, an unlogged use) or a miscount.
+                    </p>
+                  </div>
+                </div>
+                <div className="pt-3 border-t border-border-regular space-y-2">
+                  <p>
+                    <span className="font-semibold text-foreground">When you save:</span> stock is set to exactly
+                    what you counted. Any item that came out different from expected — overage or shortage — is
+                    permanently logged as a <span className="font-corp-mono text-xs">Stock Count Adjustment</span> in{' '}
+                    <span className="font-semibold text-foreground">Inventory Movements</span>, showing the before
+                    and after value, who counted it, and when. An item that matched exactly logs nothing — there's
+                    no discrepancy to record.
+                  </p>
+                  <p>
+                    <span className="font-semibold text-foreground">If anything comes up short,</span> you'll be
+                    asked afterward whether to log it as a loss under "Shrinkage" so the cost is tracked. This is
+                    always optional and never automatic — a shortage might just be a miscount, so it's your call.
+                  </p>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
 
         {/* Inventory Table */}
         <Card
