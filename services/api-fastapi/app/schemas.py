@@ -362,6 +362,18 @@ class PayrollRow(BaseModel):
     total_pay: float
     period_start: str
     period_end: str
+    regular_hours: float | None = None
+    overtime_hours: float | None = None
+    night_diff_hours: float | None = None
+    holiday_pay: float | None = None
+    overtime_pay: float | None = None
+    night_diff_pay: float | None = None
+
+
+class PayrollValidation(BaseModel):
+    attendance_complete: bool
+    holiday_configured: bool
+    pending_overrides: int
 
 
 class PayrollSummary(BaseModel):
@@ -372,12 +384,111 @@ class PayrollSummary(BaseModel):
     total_hours: float
     total_pay: float
     employee_count: int
+    engine_enabled: bool = False
+    validation: PayrollValidation | None = None
 
 
 class PayrollGenerateRequest(BaseModel):
     branch_id: str
     period_start: date
     period_end: date
+
+
+class HolidayResponse(BaseModel):
+    id: str
+    holiday_date: date
+    name: str
+    holiday_type: Literal["regular_holiday", "special_non_working", "special_working"]
+    is_recurring: bool
+    branch_scope: str | None = None
+
+
+class HolidayCreate(BaseModel):
+    holiday_date: date
+    name: str
+    holiday_type: Literal["regular_holiday", "special_non_working", "special_working"]
+    is_recurring: bool = False
+    branch_scope: str | None = None
+
+
+class HolidayUpdate(BaseModel):
+    holiday_date: date | None = None
+    name: str | None = None
+    holiday_type: Literal["regular_holiday", "special_non_working", "special_working"] | None = None
+    is_recurring: bool | None = None
+    branch_scope: str | None = None
+
+
+PayMultiplierScenario = Literal[
+    "regular_day",
+    "regular_holiday",
+    "regular_holiday_rest_day",
+    "special_non_working",
+    "special_non_working_rest_day",
+    "special_working",
+    "rest_day",
+]
+
+
+class PayMultiplierRuleResponse(BaseModel):
+    id: str
+    scenario_key: PayMultiplierScenario
+    not_worked_pct: float
+    first_8hr_pct: float
+    ot_addon_pct: float
+    night_diff_addon_pct: float
+
+
+class PayMultiplierRuleUpdate(BaseModel):
+    not_worked_pct: float | None = None
+    first_8hr_pct: float | None = None
+    ot_addon_pct: float | None = None
+    night_diff_addon_pct: float | None = None
+
+
+class PayrollRuleSettingsResponse(BaseModel):
+    engine_enabled: bool
+    hr_signatory_name: str | None = None
+    hr_signature_path: str | None = None
+
+
+class PayrollRuleSettingsUpdate(BaseModel):
+    engine_enabled: bool | None = None
+    hr_signatory_name: str | None = None
+    hr_signature_path: str | None = None
+
+
+class PayrollOverrideCreate(BaseModel):
+    attendance_log_id: str
+    field: Literal["regular_hours", "overtime_hours", "night_diff_hours", "day_scenario"]
+    new_value: str
+    reason: str
+
+
+class PayrollOverrideResponse(BaseModel):
+    id: str
+    attendance_log_id: str
+    field: str
+    old_value: str | None = None
+    new_value: str
+    reason: str
+    requested_by: str
+    approved_by: str | None = None
+    created_at: datetime
+    approved_at: datetime | None = None
+
+
+class PayrollAuditLogResponse(BaseModel):
+    id: str
+    actor_id: str | None = None
+    branch_id: str | None = None
+    action: str
+    entity_type: str
+    entity_id: str | None = None
+    old_value: dict | None = None
+    new_value: dict | None = None
+    reason: str | None = None
+    created_at: datetime
 
 
 # --- Staff Clock kiosk (PIN-based, no Supabase session) ---
@@ -424,6 +535,13 @@ class PayrollItemResponse(BaseModel):
     hours_worked: float
     pay_rate: float
     total_pay: float
+    regular_hours: float | None = None
+    overtime_hours: float | None = None
+    night_diff_hours: float | None = None
+    regular_pay: float | None = None
+    overtime_pay: float | None = None
+    holiday_pay: float | None = None
+    night_diff_pay: float | None = None
 
 
 class PayrollRecordResponse(BaseModel):

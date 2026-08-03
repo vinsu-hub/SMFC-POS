@@ -314,11 +314,76 @@ export interface UpdateEmployeeRequest {
   payroll_schedule?: string | null;
 }
 
+export interface ApiPayrollValidation {
+  attendance_complete: boolean;
+  holiday_configured: boolean;
+  pending_overrides: number;
+}
+
+export interface ApiHoliday {
+  id: string;
+  holiday_date: string;
+  name: string;
+  holiday_type: 'regular_holiday' | 'special_non_working' | 'special_working';
+  is_recurring: boolean;
+  branch_scope: string | null;
+}
+
+export type PayMultiplierScenario =
+  | 'regular_day'
+  | 'regular_holiday'
+  | 'regular_holiday_rest_day'
+  | 'special_non_working'
+  | 'special_non_working_rest_day'
+  | 'special_working'
+  | 'rest_day';
+
+export interface ApiPayMultiplierRule {
+  id: string;
+  scenario_key: PayMultiplierScenario;
+  not_worked_pct: number;
+  first_8hr_pct: number;
+  ot_addon_pct: number;
+  night_diff_addon_pct: number;
+}
+
+export interface ApiPayrollOverride {
+  id: string;
+  attendance_log_id: string;
+  field: string;
+  old_value: string | null;
+  new_value: string;
+  reason: string;
+  requested_by: string;
+  approved_by: string | null;
+  created_at: string;
+  approved_at: string | null;
+}
+
+export interface ApiPayrollAuditLogEntry {
+  id: string;
+  actor_id: string | null;
+  branch_id: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  old_value: Record<string, unknown> | null;
+  new_value: Record<string, unknown> | null;
+  reason: string | null;
+  created_at: string;
+}
+
 export interface ApiPayrollRow {
   employee_id: string;
   employee_name: string;
   position: string;
   branch_id: string;
+  regular_hours?: number | null;
+  overtime_hours?: number | null;
+  night_diff_hours?: number | null;
+  holiday_pay?: number | null;
+  overtime_pay?: number | null;
+  night_diff_pay?: number | null;
   hours_worked: number;
   pay_rate: number;
   total_pay: number;
@@ -334,6 +399,39 @@ export interface ApiPayrollSummary {
   total_hours: number;
   total_pay: number;
   employee_count: number;
+  engine_enabled?: boolean;
+  validation?: ApiPayrollValidation | null;
+}
+
+export interface ApiPayrollItem {
+  id: string;
+  payroll_record_id: string;
+  employee_id: string;
+  employee_name: string;
+  position: string | null;
+  hours_worked: number;
+  pay_rate: number;
+  total_pay: number;
+  regular_hours?: number | null;
+  overtime_hours?: number | null;
+  night_diff_hours?: number | null;
+  regular_pay?: number | null;
+  overtime_pay?: number | null;
+  holiday_pay?: number | null;
+  night_diff_pay?: number | null;
+}
+
+export interface ApiPayrollRecord {
+  id: string;
+  branch_id: string;
+  period_start: string;
+  period_end: string;
+  total_hours: number;
+  total_pay: number;
+  employee_count: number;
+  generated_by: string;
+  created_at: string;
+  items: ApiPayrollItem[];
 }
 
 export interface ApiHrFlag {
@@ -713,6 +811,117 @@ export function fetchPayrollSummary(
   dateTo: string
 ): Promise<ApiPayrollSummary> {
   return request(`/branches/${branchId}/attendance/summary?date_from=${dateFrom}&date_to=${dateTo}`);
+}
+
+export function generatePayroll(
+  branchId: string,
+  periodStart: string,
+  periodEnd: string
+): Promise<ApiPayrollRecord> {
+  return request('/payroll', {
+    method: 'POST',
+    body: JSON.stringify({ branch_id: branchId, period_start: periodStart, period_end: periodEnd }),
+  });
+}
+
+export function listPayrollRecords(branchId: string, limit = 50): Promise<ApiPayrollRecord[]> {
+  return request(`/payroll?branch_id=${branchId}&limit=${limit}`);
+}
+
+export function fetchPayrollRecordForPrint(payrollId: string): Promise<ApiPayrollRecord> {
+  return request(`/payroll/${payrollId}/print`);
+}
+
+export function fetchHolidays(year: number, branchId?: string): Promise<ApiHoliday[]> {
+  const params = new URLSearchParams({ year: String(year) });
+  if (branchId) params.append('branch_id', branchId);
+  return request(`/hr/holidays?${params.toString()}`);
+}
+
+export function createHoliday(body: {
+  holiday_date: string;
+  name: string;
+  holiday_type: ApiHoliday['holiday_type'];
+  is_recurring?: boolean;
+  branch_scope?: string | null;
+}): Promise<ApiHoliday> {
+  return request('/hr/holidays', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function updateHoliday(id: string, body: Partial<Omit<ApiHoliday, 'id'>>): Promise<ApiHoliday> {
+  return request(`/hr/holidays/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+}
+
+export function deleteHoliday(id: string): Promise<{ deleted: boolean }> {
+  return request(`/hr/holidays/${id}`, { method: 'DELETE' });
+}
+
+export function fetchPayMultiplierRules(): Promise<ApiPayMultiplierRule[]> {
+  return request('/hr/pay-rules');
+}
+
+export function updatePayMultiplierRule(
+  scenarioKey: PayMultiplierScenario,
+  body: Partial<Pick<ApiPayMultiplierRule, 'not_worked_pct' | 'first_8hr_pct' | 'ot_addon_pct' | 'night_diff_addon_pct'>>
+): Promise<ApiPayMultiplierRule> {
+  return request(`/hr/pay-rules/${scenarioKey}`, { method: 'PATCH', body: JSON.stringify(body) });
+}
+
+export interface ApiPayrollSettings {
+  engine_enabled: boolean;
+  hr_signatory_name?: string | null;
+  hr_signature_path?: string | null;
+}
+
+export function fetchPayrollSettings(): Promise<ApiPayrollSettings> {
+  return request('/hr/payroll-settings');
+}
+
+export function updatePayrollSettings(body: Partial<ApiPayrollSettings>): Promise<ApiPayrollSettings> {
+  return request('/hr/payroll-settings', { method: 'PATCH', body: JSON.stringify(body) });
+}
+
+export async function uploadHrSignature(file: File): Promise<string> {
+  const extension = file.name.split('.').pop() ?? 'png';
+  const path = `hr-signatory-${crypto.randomUUID()}.${extension}`;
+  const { error } = await supabase.storage.from('payroll-signatures').upload(path, file, {
+    contentType: file.type,
+  });
+  if (error) {
+    throw new Error(`Signature upload failed: ${error.message}`);
+  }
+  return path;
+}
+
+export async function getHrSignatureUrl(path: string): Promise<string | null> {
+  const { data, error } = await supabase.storage.from('payroll-signatures').createSignedUrl(path, 300);
+  if (error) return null;
+  return data.signedUrl;
+}
+
+export function createPayrollOverride(body: {
+  attendance_log_id: string;
+  field: 'regular_hours' | 'overtime_hours' | 'night_diff_hours' | 'day_scenario';
+  new_value: string;
+  reason: string;
+}): Promise<ApiPayrollOverride> {
+  return request('/hr/payroll-overrides', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export function approvePayrollOverride(overrideId: string): Promise<ApiPayrollOverride> {
+  return request(`/hr/payroll-overrides/${overrideId}/approve`, { method: 'PATCH' });
+}
+
+export function fetchPayrollAuditLog(params: {
+  branchId?: string;
+  entityType?: string;
+  limit?: number;
+}): Promise<ApiPayrollAuditLogEntry[]> {
+  const query = new URLSearchParams();
+  if (params.branchId) query.append('branch_id', params.branchId);
+  if (params.entityType) query.append('entity_type', params.entityType);
+  if (params.limit) query.append('limit', String(params.limit));
+  return request(`/hr/payroll-audit-log?${query.toString()}`);
 }
 
 async function requestBlob(path: string): Promise<Blob> {

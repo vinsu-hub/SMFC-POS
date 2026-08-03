@@ -25,6 +25,8 @@ import InventoryMovements from "./pages/InventoryMovements";
 import UtilityLog from "./pages/UtilityLog";
 import HRAttendance from "./pages/HRAttendance";
 import HRPayroll from "./pages/HRPayroll";
+import HolidayCalendar from "./pages/HolidayCalendar";
+import PayrollSettings from "./pages/PayrollSettings";
 import NotFound from "./pages/NotFound";
 
 function Router() {
@@ -47,6 +49,8 @@ function Router() {
       <Route path={"/utility-log"} component={UtilityLog} />
       <Route path={"/hr/attendance"} component={HRAttendance} />
       <Route path={"/hr/payroll"} component={HRPayroll} />
+      <Route path={"/hr/holiday-calendar"} component={HolidayCalendar} />
+      <Route path={"/hr/payroll-settings"} component={PayrollSettings} />
       <Route path={"/settings"} component={Settings} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}

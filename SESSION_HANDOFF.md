@@ -1,10 +1,18 @@
 # SMFC POS — Session Handoff
 
-**Date:** 2026-08-02 (Sun)
-**Branch:** `main` — committed and pushed to `origin/main`
+**Date:** 2026-08-03 (Mon)
+**Branch:** `main` — **not yet committed** (this session's changes are on disk, uncommitted — see below)
 **Repo:** `https://github.com/vinsu-hub/SMFC-POS.git`
 **Local working copy this session:** `D:\SMFC_POS\saint_michael_pos\saint_michael_pos`
-**Production:** ✅ Deployed and live (backend, dashboard, and staff-clock kiosk all now deployed — see below)
+**Production:** ✅ Deployed and live as of 2026-08-02 (this session's payroll engine work has **not** been deployed)
+
+---
+
+## ⚠️ ACTION NEEDED BEFORE CONTINUING
+
+This session added **migrations `0022` through `0028`** (holiday calendar, DOLE pay-multiplier rules, attendance/payroll_items breakdown columns, overrides, audit log) — **not yet applied** to the shared Supabase project. Same as every prior DDL change, this environment's CLI has no `supabase link` access, so apply them in order via the Supabase Dashboard SQL Editor for project `autaunyrcqdbhprfdhfh` before testing the new payroll engine or running `tests/test_payroll_engine.py`. Everything else (code) is already in place and working against the flat-rate path in the meantime.
+
+Also: this session's changes have not been committed to git yet (check `git status`).
 
 ---
 
@@ -15,7 +23,7 @@ git clone https://github.com/vinsu-hub/SMFC-POS.git
 cd SMFC-POS
 ```
 
-Everything below (migrations, seed data) has already been applied to the **shared Supabase project** (`autaunyrcqdbhprfdhfh`) that both local dev and production point at — there is no separate dev/prod DB to sync. You only need to `git pull` and set up local `.env` files (copy from `.env.example` or ask for the values — they're not committed) to resume local dev. No new migrations are pending.
+Everything up through migration `0021` has already been applied to the **shared Supabase project** (`autaunyrcqdbhprfdhfh`) that both local dev and production point at — there is no separate dev/prod DB to sync. Migrations `0022`–`0028` (this session) are **pending** — see the action-needed note above. You only need to `git pull` and set up local `.env` files (copy from `.env.example` or ask for the values — they're not committed) to resume local dev.
 
 ```bash
 # Backend (from services/api-fastapi) — avoid --reload, unreliable on Windows
@@ -53,7 +61,29 @@ All three point at the same Supabase project (`autaunyrcqdbhprfdhfh`). Staff Clo
 
 ---
 
-## What This Session Covered
+## What This Session Covered (2026-08-03)
+
+Built a **Payroll Holiday-Pay Multiplier Engine** plus an adjustable payroll rules section in HR — implemented per a plan at `C:\Users\vinsu\.claude\plans\we-are-improvting-the-resilient-yeti.md` (payroll-scoped only; a separate Command Center Overview redesign was explicitly deferred, as was most of a broader enterprise-UI spec the user supplied — only the pieces relevant to Payroll/Holiday-Calendar/Payroll-Settings were adopted).
+
+### 1. Backend: DOLE Labor Advisory 12-25 engine
+- New tables (migrations `0022`–`0028`, **not yet applied** — see action-needed note above): `hr.holidays`, `hr.pay_multiplier_rules` (7 DOLE scenarios: regular day, regular holiday ± rest day, special non-working ± rest day, special working, rest day), `hr.payroll_rule_settings` (single-row `engine_enabled` flag, defaults `false`), `hr.payroll_overrides` (reason + approver required, no direct payroll edits), `hr.payroll_audit_log` (payroll-scoped, not app-wide). Also extends `hr.attendance_logs` and `hr.payroll_items` with breakdown columns (`regular_hours`/`overtime_hours`/`night_diff_hours`/`day_scenario`/`holiday_id`).
+- Seeded 2026 PH holiday calendar (fixed dates only — Eid'l Fitr/Eid'l Adha left as a `TODO` follow-up migration since they're lunar-dependent and unproclaimed).
+- `services/api-fastapi/app/attendance_utils.py`: added `resolve_day_scenario`, `split_regular_and_overtime`, `compute_night_diff_hours` (PH-local-time-aware — every other timestamp in this codebase is raw UTC with no Asia/Manila conversion, but night-diff specifically needed it for legal correctness), `compute_attendance_breakdown` — wired into `clock_out` and the stale-shift auto-closer.
+- `services/api-fastapi/app/routers/hr.py`: fixed a real bug — `_resolve_branch_and_company` (was line 273) had a hardcoded `"Saint Michael Food Corp"` fallback used whenever a branch had no `organization_id` link; now falls back to the real branch name. Rewrote `_compute_payroll_summary` to be engine-flag-aware: byte-identical flat-rate output when `engine_enabled=false` (zero regression risk), full DOLE multiplier math when `true`. Added holiday/pay-rule/settings/override/audit-log CRUD endpoints. **Wired up the previously dead `POST /payroll` / `GET /payroll` / `GET /payroll/{id}/print` endpoints** — they existed in the backend for a while but had zero frontend callers; now the dashboard's "Generate Payroll" actually persists a run and History shows real past runs.
+- `services/api-fastapi/app/payroll_pdf.py`: optional OT/night-diff/holiday breakdown rows on the payslip PDF, only rendered when non-zero. Currency still prints as `"PHP 1,234.56"` text, not the ₱ glyph — no Unicode TTF font exists in the repo to embed, confirmed via grep; kept as-is.
+- Tests: `tests/test_attendance_utils.py` (8 pure unit tests, **passing now**, no DB needed — hour-splitting, night-diff window math including a midnight-crossing shift, scenario-key mapping). `tests/test_payroll_engine.py` (3 integration tests against real Supabase via `conftest.py`-style fixtures — DOLE math correctness, engine-off regression, override math — **blocked on migrations `0022`–`0028` being applied**, not yet run).
+
+### 2. Frontend: new pages + Payroll restructure
+- New page `apps/dashboard-web/client/src/pages/HolidayCalendar.tsx` — Upcoming/Table/Audit-Log views, executive-edit / manager-read-only, linked from Sidebar and the Payroll toolbar. (Simplified from the original plan's Calendar-grid + Import views — judged not worth the extra surface over Table/Upcoming + the existing Add-Holiday dialog.)
+- New page `apps/dashboard-web/client/src/pages/PayrollSettings.tsx` — Employee Pay Rates (moved here from the old Payroll "History" tab, which was actually a rate-editor mislabeled as history), Multiplier Rules (editable DOLE percentage table), engine on/off toggle (executive-only, explicitly labeled as a production-wide switch since there's no dev/prod split), Approval Workflow and Payslip Layout info tabs. Consolidated the plan's separate Night-Differential/Overtime/Holiday-Rules tabs into one Multiplier Rules table since they're columns of the same underlying data.
+- `HRPayroll.tsx` fully restructured: sticky Toolbar (branch/period/Generate Payroll/Holiday Calendar link/Settings link) → executive-style Summary Cards (Total Payroll, Holiday Premium, Night Differential, Overtime, Employees) → Validation Panel (status chips: attendance complete, holiday configured, pending overrides, engine on/off) → Main Table (row click opens an Employee Drawer) → real payroll History (was previously the mislabeled rate-editor).
+- Employee Drawer (right-side sheet): Overview / Breakdown / Overrides / Payslip tabs. **Not fully wired**: the Overrides tab's submit button currently just shows an info toast — targeting a specific attendance log needs a per-day log picker that wasn't in the original page; flagged as the natural next step, not silently stubbed.
+- `lib/api.ts`: added ~15 new wrapper functions and types for holidays/pay-rules/settings/overrides/audit-log/payroll persistence, following the existing `request()` pattern.
+- Verified live in a real browser (Playwright) against the running dev servers, logged in as `manager@danielito-agapita.com` — all three pages render correctly; the parts needing the unapplied migrations fail gracefully with a toast (not a crash), exactly as expected pre-migration. `tsc --noEmit` shows the same 15 pre-existing unrelated errors (Sidebar/HRAttendance/InventoryMovements/UtilityLog null-check issues, not touched this session) and zero new ones.
+
+---
+
+## What This Session Covered (2026-08-02)
 
 This was a long session building on top of the prior one's inventory-movements/staff-clock/utility-monitor work. Major pieces, roughly in order:
 
@@ -116,7 +146,9 @@ Employees now see **only** an Account Settings card (email, role, Sign Out) — 
 
 ---
 
-## Database — Supabase Migrations (0015 through 0021, all applied)
+## Database — Supabase Migrations
+
+### 0015–0021 (applied 2026-08-02)
 
 | File | Purpose |
 |---|---|
@@ -128,18 +160,35 @@ Employees now see **only** an Account Settings card (email, role, Sign Out) — 
 | `0020_transaction_item_edits.sql` | `transaction_items` gains `held_ingredient_ids uuid[]` |
 | `0021_transaction_fulfilled.sql` | `transactions` gains `fulfilled`/`fulfilled_at` (Order Queue's "Done" button) |
 
-All applied directly to the live Supabase project via the SQL Editor (this environment's CLI login doesn't have `supabase link` access to that project — DDL changes need the Dashboard SQL Editor; plain row reads/writes work fine via the service-role REST client already used everywhere in the backend/scripts).
+### 0022–0028 (written 2026-08-03, **NOT YET APPLIED** — see action-needed note at top)
+
+| File | Purpose |
+|---|---|
+| `0022_hr_holiday_calendar.sql` | New `hr.holidays` table (date/name/type/recurring/branch-scope) |
+| `0023_hr_pay_multiplier_rules.sql` | New `hr.pay_multiplier_rules` (7 DOLE scenarios) + `hr.payroll_rule_settings` (engine on/off flag) |
+| `0024_hr_seed_2026_holidays_and_rates.sql` | Seeds DOLE Labor Advisory 12-25 rates + 2026 PH holiday calendar (Eid dates TBD) |
+| `0025_hr_attendance_breakdown_columns.sql` | `hr.attendance_logs` gains `regular_hours`/`overtime_hours`/`night_diff_hours`/`is_rest_day`/`holiday_id`/`day_scenario` |
+| `0026_hr_payroll_items_breakdown.sql` | Same breakdown columns on `hr.payroll_items` |
+| `0027_hr_payroll_overrides.sql` | New `hr.payroll_overrides` table (reason + approver required) |
+| `0028_hr_payroll_audit_log.sql` | New `hr.payroll_audit_log` table (payroll-scoped audit trail) |
+
+All migrations (past and pending) apply directly to the live Supabase project via the SQL Editor (this environment's CLI login doesn't have `supabase link` access to that project — DDL changes need the Dashboard SQL Editor; plain row reads/writes work fine via the service-role REST client already used everywhere in the backend/scripts).
 
 ---
 
-## Known Gaps / Not Done This Session
+## Known Gaps / Not Done
 
 | Item | Status |
 |---|---|
-| Payslip PDF header still says "Saint Michael Food Corp" | Not renamed — pulls from `organizations.name`, separate from Login page branding |
+| Migrations `0022`–`0028` not applied | **Blocking** — see action-needed note at top. Apply before testing the payroll engine. |
+| Employee Drawer → Overrides tab not fully wired | Submit button shows an info toast instead of creating a real `hr.payroll_overrides` row — needs a per-day attendance-log picker inside the drawer's Attendance tab first |
+| Holiday Calendar has no month-grid/Import view | Simplified to Upcoming/Table/Audit-Log — a full calendar-grid widget and separate "Import DOLE data" flow were judged not worth the extra surface over the existing Add-Holiday dialog |
+| Command Center Overview redesign | Explicitly deferred (separate from this session's payroll scope) — user supplied a full enterprise-UI spec covering Inventory/POS/Command Center/Malaya AI/Newsfeed/etc.; only the Payroll/Holiday-Calendar/Payroll-Settings pieces were adopted, the rest flagged as a future initiative |
+| ₱ peso glyph in payslip PDF | Still renders as `"PHP 1,234.56"` text — no Unicode TTF font embedded in the repo |
+| Payslip PDF header still says "Saint Michael Food Corp" (fixed the *other* hardcode) | The `_resolve_branch_and_company` fallback in `hr.py` was fixed this session; if the org's `organizations.name` row itself still says "Saint Michael Food Corp", that's separate data, not code |
 | Old legacy branch rows (`danielito`, `malaya`, `dden`, `dbar`, `catering`) | Left in place deliberately (`dbar` has real historical transactions) — filtered from UI, not deleted |
 | Tagaytay-location employee profile `full_name` fields | Still say "...Tagaytay - Alfonso (Kaybagal North)" — set before the location was renamed to "Tagaytay City"; cosmetic only, seed script doesn't overwrite existing `full_name` |
-| Backend test coverage | Still zero automated tests beyond the two manual dry-run/functional scripts added this session (`scripts/test_order_edit.py`, `scripts/seed_attendance_and_test_payroll.py`) |
+| Backend test coverage | 8 pure unit tests + 3 integration tests added this session (`tests/test_attendance_utils.py`, `tests/test_payroll_engine.py`); integration tests blocked on migrations. Plus the two manual dry-run/functional scripts from 2026-08-02 (`scripts/test_order_edit.py`, `scripts/seed_attendance_and_test_payroll.py`) |
 | Bundle size warning | Dashboard's main JS chunk is ~1.35MB — Vite warns about it on every build, not addressed (code-splitting opportunity) |
 
 ---
@@ -163,7 +212,7 @@ Full list of all 12 locations' theme keys is in `apps/dashboard-web/client/src/l
 
 ---
 
-## Testing Checklist (confirmed working this session)
+## Testing Checklist (confirmed working 2026-08-02)
 
 - [x] Multi-company login/branding across all 12 locations
 - [x] Command Center: all 7 top tabs render (Overview, 5 companies, Utility Monitor), nested location sub-tabs
@@ -177,3 +226,13 @@ Full list of all 12 locations' theme keys is in `apps/dashboard-web/client/src/l
 - [x] Order Queue: Void (restores inventory, verified no double-restore bug), Edit (hold ingredient → positive variance, verified with automated test), Done (removes from active queue)
 - [x] Settings page correctly restricted for employee role
 - [x] Staff Clock kiosk deployed and reachable in production
+
+## Testing Checklist (confirmed working 2026-08-03)
+
+- [x] `pytest tests/test_attendance_utils.py` — 8/8 pure unit tests pass (hour-splitting, night-diff window math, scenario mapping)
+- [x] `tsc --noEmit` — zero new errors introduced, same 15 pre-existing unrelated ones
+- [x] Payroll page renders with new Toolbar/Summary Cards/Validation Panel/Table layout (verified live via Playwright, logged in as `manager@danielito-agapita.com`) — flat-rate math unaffected (engine still off)
+- [x] Holiday Calendar page renders (Upcoming/Table/Audit tabs), fails gracefully with a toast (not a crash) since `hr.holidays` doesn't exist yet
+- [x] Payroll Settings page renders — Employee Pay Rates works today (no migration needed), engine toggle correctly locked to executive-only for a manager login, fails gracefully on the still-missing `hr.payroll_rule_settings` table
+- [ ] `pytest tests/test_payroll_engine.py` — **not yet run**, needs migrations `0022`–`0028` applied first
+- [ ] End-to-end: flip `engine_enabled` on, generate payroll for a period with a seeded holiday, confirm payslip PDF shows the breakdown and totals match manual DOLE-table math — **not yet done**, needs migrations applied

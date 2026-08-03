@@ -25,6 +25,7 @@ import {
   RefreshCw,
   ListOrdered,
   Percent,
+  CalendarDays,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -72,6 +73,7 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
           { icon: Zap, label: 'Utility Log', href: '/utility-log', show: true },
           { icon: Users, label: 'HR Management', href: '/hr/attendance', show: true },
           { icon: Wallet, label: 'Payroll', href: '/hr/payroll', show: true },
+          { icon: CalendarDays, label: 'Holiday Calendar', href: '/hr/holiday-calendar', show: true },
           { icon: MessageSquare, label: 'Newsfeed', href: '/newsfeed', show: true },
         ]
       : []),
@@ -83,6 +85,7 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
           { icon: Sparkles, label: 'Malaya AI', href: '/malaya', show: true },
           { icon: Users, label: 'HR Management', href: '/hr/attendance', show: true },
           { icon: Wallet, label: 'Payroll', href: '/hr/payroll', show: true },
+          { icon: CalendarDays, label: 'Holiday Calendar', href: '/hr/holiday-calendar', show: true },
           { icon: MessageSquare, label: 'Newsfeed', href: '/newsfeed', show: true },
         ]
       : []),
