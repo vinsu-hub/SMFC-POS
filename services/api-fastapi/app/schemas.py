@@ -68,6 +68,7 @@ class TransactionItemResponse(BaseModel):
     quantity: float
     unit_price: float
     held_ingredient_ids: list[str] = []
+    held_ingredient_names: list[str] = []
     note: str | None = None
 
 

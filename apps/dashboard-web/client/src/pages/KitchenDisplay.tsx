@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -33,6 +33,7 @@ import {
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { OwnerRequestBadge } from '@/components/shared/OwnerRequestBadge';
 import { ModifierTag } from '@/components/shared/ModifierTag';
+import { NEW_ORDER_SOUND, playOrderSound } from '@/lib/orderSounds';
 
 const STATIONS: { value: KitchenStation; label: string }[] = [
   { value: 'grill', label: 'Grill' },
@@ -79,6 +80,15 @@ export default function KitchenDisplay() {
   const [expandedColumns, setExpandedColumns] = useState<Set<KitchenStatus>>(new Set());
   const [transitioningId, setTransitioningId] = useState<string | null>(null);
 
+  // Refs, not state, so the 20s poll interval (set up once on mount) always
+  // reads the latest soundOn toggle and the previous-poll snapshot without
+  // needing to be torn down and recreated every time either changes.
+  const soundOnRef = useRef(soundOn);
+  useEffect(() => {
+    soundOnRef.current = soundOn;
+  }, [soundOn]);
+  const seenQueuedIdsRef = useRef<Set<string> | null>(null);
+
   const loadData = () => {
     if (!user?.branchId) return;
     setLoading(true);
@@ -87,6 +97,19 @@ export default function KitchenDisplay() {
         setTransactions(txData);
         setProducts(productData);
         setSummary(summaryData);
+
+        // Alert every active tab watching this board when a brand-new order
+        // lands in Queued -- but never on first load, or every pre-existing
+        // order would chime at once.
+        const currentQueuedIds = new Set(
+          txData.filter((t) => t.status !== 'voided' && t.kitchen_status === 'queued').map((t) => t.id)
+        );
+        const previouslySeen = seenQueuedIdsRef.current;
+        if (previouslySeen) {
+          const hasNewOrder = Array.from(currentQueuedIds).some((id) => !previouslySeen.has(id));
+          if (hasNewOrder && soundOnRef.current) playOrderSound(NEW_ORDER_SOUND);
+        }
+        seenQueuedIdsRef.current = currentQueuedIds;
       })
       .catch(() => toast.error('Could not load kitchen orders. Check your connection.'))
       .finally(() => setLoading(false));
@@ -151,10 +174,6 @@ export default function KitchenDisplay() {
     setTransitioningId(transactionId);
     try {
       await updateKitchenStatus(transactionId, nextStatus);
-      if (soundOn) {
-        // No audio asset wired up yet — sound toggle is UI-only for now,
-        // a real chime is a small follow-up once an asset is provided.
-      }
       loadData();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not update order status');
@@ -280,6 +299,9 @@ export default function KitchenDisplay() {
                                 {t.items.map((item) => (
                                   <div key={item.id} className="text-xs flex items-center gap-1.5 flex-wrap">
                                     <span>{item.quantity}x {productName(item.product_id)}</span>
+                                    {item.held_ingredient_names.map((name) => (
+                                      <ModifierTag key={name} label={name} variant="removed" />
+                                    ))}
                                     {item.note && <ModifierTag label={item.note} variant="note" />}
                                   </div>
                                 ))}

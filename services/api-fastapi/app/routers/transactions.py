@@ -216,6 +216,29 @@ def close_transaction(transaction_id: str, user: CurrentUser = Depends(get_curre
     return TransactionResponse(**transaction, items=items_result.data)
 
 
+def _attach_held_ingredient_names(supabase, items: list[dict]) -> list[dict]:
+    """Resolves held_ingredient_ids -> real ingredient names, in one batched
+    query across every item passed in, so Order Queue and Kitchen Display
+    can render "No Rice"-style tags on the order card itself instead of only
+    inside the Edit dialog (the only place that previously looked these up).
+    """
+    all_ingredient_ids = {iid for item in items for iid in (item.get("held_ingredient_ids") or [])}
+    if not all_ingredient_ids:
+        for item in items:
+            item["held_ingredient_names"] = []
+        return items
+
+    ingredients_result = (
+        supabase.table("ingredients").select("id, name").in_("id", list(all_ingredient_ids)).execute()
+    )
+    name_by_id = {i["id"]: i["name"] for i in ingredients_result.data}
+    for item in items:
+        item["held_ingredient_names"] = [
+            name_by_id.get(iid, "Unknown") for iid in (item.get("held_ingredient_ids") or [])
+        ]
+    return items
+
+
 def _fetch_transaction_with_items(supabase, transaction_id: str) -> dict | None:
     result = (
         supabase.table("transactions").select("*").eq("id", transaction_id).maybe_single().execute()
@@ -226,7 +249,7 @@ def _fetch_transaction_with_items(supabase, transaction_id: str) -> dict | None:
     items_result = (
         supabase.table("transaction_items").select("*").eq("transaction_id", transaction_id).execute()
     )
-    transaction["items"] = items_result.data
+    transaction["items"] = _attach_held_ingredient_names(supabase, items_result.data)
     return transaction
 
 
@@ -261,8 +284,9 @@ def list_transactions(
     items_result = (
         supabase.table("transaction_items").select("*").in_("transaction_id", transaction_ids).execute()
     )
+    items_with_names = _attach_held_ingredient_names(supabase, items_result.data)
     items_by_transaction: dict[str, list] = {}
-    for item in items_result.data:
+    for item in items_with_names:
         items_by_transaction.setdefault(item["transaction_id"], []).append(item)
 
     return [

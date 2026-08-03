@@ -59,6 +59,7 @@ export interface ApiTransaction {
     quantity: number;
     unit_price: number;
     held_ingredient_ids: string[];
+    held_ingredient_names: string[];
     note: string | null;
   }[];
 }

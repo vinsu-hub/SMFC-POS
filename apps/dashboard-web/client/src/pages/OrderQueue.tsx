@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,6 +26,8 @@ import {
   Users,
   ShoppingBag,
   CheckCircle,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
@@ -46,6 +48,7 @@ import {
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { OwnerRequestBadge } from '@/components/shared/OwnerRequestBadge';
 import { ModifierTag } from '@/components/shared/ModifierTag';
+import { ORDER_READY_SOUND, playOrderSound } from '@/lib/orderSounds';
 
 interface EditItemForm {
   quantity: string;
@@ -86,6 +89,16 @@ export default function OrderQueue() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('newest');
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [soundOn, setSoundOn] = useState(true);
+
+  // Refs, not state, so the poll interval (set up once on mount) always
+  // reads the latest soundOn toggle and the previous-poll snapshot without
+  // needing to be torn down and recreated every time either changes.
+  const soundOnRef = useRef(soundOn);
+  useEffect(() => {
+    soundOnRef.current = soundOn;
+  }, [soundOn]);
+  const seenReadyIdsRef = useRef<Set<string> | null>(null);
 
   const loadData = () => {
     if (!user?.branchId) return;
@@ -100,12 +113,33 @@ export default function OrderQueue() {
         setProducts(productData);
         setSummary(summaryData);
         setLastUpdated(new Date());
+
+        // Alert the front-of-house/kiosk whenever an order the kitchen just
+        // marked Ready shows up -- skip on first load so pre-existing Ready
+        // orders don't all chime at once.
+        const currentReadyIds = new Set(
+          txData.filter((t) => t.status !== 'voided' && t.kitchen_status === 'ready').map((t) => t.id)
+        );
+        const previouslySeen = seenReadyIdsRef.current;
+        if (previouslySeen) {
+          const hasNewlyReady = Array.from(currentReadyIds).some((id) => !previouslySeen.has(id));
+          if (hasNewlyReady && soundOnRef.current) playOrderSound(ORDER_READY_SOUND);
+        }
+        seenReadyIdsRef.current = currentReadyIds;
       })
       .catch(() => toast.error("Could not load today's orders. Check your connection."))
       .finally(() => setLoading(false));
   };
 
   useEffect(loadData, [user?.branchId, dateFilter]);
+
+  // Poll so the kiosk/front-of-house tab picks up a kitchen-side Ready
+  // transition (and the sound alert above) without a manual refresh.
+  useEffect(() => {
+    const poll = setInterval(loadData, 20000);
+    return () => clearInterval(poll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.branchId, dateFilter]);
 
   const productName = (id: string) => products.find((p) => p.id === id)?.name ?? 'Unknown item';
   const productAvailability = (id: string) => products.find((p) => p.id === id)?.availability ?? 'available';
@@ -295,6 +329,9 @@ export default function OrderQueue() {
               <Button variant="outline" size="sm" onClick={loadData} className="gap-1.5 h-7">
                 <RefreshCw className="w-3.5 h-3.5" /> Refresh
               </Button>
+              <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setSoundOn((s) => !s)} title="Toggle ready-for-pickup sound">
+                {soundOn ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+              </Button>
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -418,6 +455,9 @@ export default function OrderQueue() {
                             <div key={item.id} className="flex items-center justify-between text-sm">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span>{item.quantity}x {productName(item.product_id)}</span>
+                                {item.held_ingredient_names.map((name) => (
+                                  <ModifierTag key={name} label={name} variant="removed" />
+                                ))}
                                 {item.note && <ModifierTag label={item.note} variant="note" />}
                               </div>
                               <span className="font-corp-mono">{formatCurrency(item.unit_price * item.quantity)}</span>

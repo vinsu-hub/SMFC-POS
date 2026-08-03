@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 
 from app.deps import get_supabase
 from app.routers.malaya import (
@@ -95,7 +95,10 @@ def test_sales_trend_includes_todays_sale(client, matcha_latte_scenario):
     trend = _sales_trend(supabase, [scenario["branch_id"]], days=30)
 
     assert len(trend["daily_revenue"]) == 30
-    today_key = date.today().isoformat()
+    # _sales_trend buckets by UTC date -- use the same clock the backend
+    # uses, not the test machine's local date, which can differ near
+    # midnight UTC (this test flaked exactly that way once already).
+    today_key = datetime.now(timezone.utc).date().isoformat()
     today_row = next(r for r in trend["daily_revenue"] if r["date"] == today_key)
     assert today_row["revenue"] >= 150.0
     today_top = next((r for r in trend["daily_top_product"] if r["date"] == today_key), None)
