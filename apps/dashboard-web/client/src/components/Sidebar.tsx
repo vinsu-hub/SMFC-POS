@@ -74,6 +74,7 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
           { icon: Users, label: 'HR Management', href: '/hr/attendance', show: true },
           { icon: Wallet, label: 'Payroll', href: '/hr/payroll', show: true },
           { icon: CalendarDays, label: 'Holiday Calendar', href: '/hr/holiday-calendar', show: true },
+          { icon: Sparkles, label: 'Malaya AI', href: '/malaya', show: true },
           { icon: MessageSquare, label: 'Newsfeed', href: '/newsfeed', show: true },
         ]
       : []),

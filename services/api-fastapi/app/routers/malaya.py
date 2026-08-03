@@ -1,13 +1,14 @@
 import json
 import os
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from groq import Groq
 
 from app.auth import CurrentUser, get_current_user
 from app.deps import get_supabase
+from app.routers.hr import _compute_payroll_summary
 from app.routers.summary import _compute_branch_summary, _compute_organization_summary, _today_bounds
 from app.schemas import MalayaQueryRequest, MalayaQueryResponse
 
@@ -56,6 +57,23 @@ don't guess from the wrong one:
 - recent_losses: the 10 most recent individual loss log entries, for
   "what was just logged" / recency-style questions — not a complete
   picture of all-time totals.
+- payroll_analysis: aggregate payroll for the CURRENT semimonthly pay
+  period only (see period_start/period_end in this field) — total_payroll_cost,
+  total_hours, employee_count, engine_enabled. Use top_overtime_holiday_driver
+  for "who's costing the most in OT/holiday pay" questions. This is a summary,
+  not a per-employee breakdown — don't invent individual pay figures beyond
+  the one named driver.
+- sales_trend_30d.daily_revenue: revenue per calendar day for the last 30
+  days — use for trend / week-over-week / month-scale comparison questions,
+  not todays_summary.
+- sales_trend_30d.daily_top_product: best-selling product per day over the
+  same 30-day window — distinct from best_seller_today, which is today only.
+- inventory_analysis.total_valuation: current total peso value of all
+  on-hand stock across the scope.
+- inventory_analysis.low_stock_items: ingredients at or below their reorder
+  threshold, worst shortage first, capped at 15 rows — use for "what needs
+  restocking" questions. low_stock_count is the true total even if the list
+  is capped.
 """
 
 
@@ -194,8 +212,168 @@ def _loss_analysis(supabase, branch_ids: list[str]) -> dict:
     }
 
 
+def _current_semimonthly_period(today: date | None = None) -> tuple[date, date]:
+    """PH payroll runs semimonthly (1st-15th, 16th-end of month) — same
+    cadence the DOLE holiday-pay engine and HR Payroll page already assume.
+    """
+    today = today or datetime.now(timezone.utc).date()
+    if today.day <= 15:
+        return today.replace(day=1), today.replace(day=15)
+    start = today.replace(day=16)
+    next_month = (today.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return start, next_month - timedelta(days=1)
+
+
+def _payroll_analysis(supabase, branch_ids: list[str]) -> dict:
+    """Aggregate-only payroll context for the current pay period — deliberately
+    not a per-employee dump (see top_overtime_holiday_driver) so individual
+    compensation figures don't flow into the LLM prompt/logs beyond one named
+    driver, same restraint _loss_analysis applies to loss_records.
+    """
+    period_start, period_end = _current_semimonthly_period()
+    if not branch_ids:
+        return {
+            "period_start": period_start.isoformat(), "period_end": period_end.isoformat(),
+            "total_payroll_cost": 0, "total_hours": 0, "employee_count": 0,
+            "engine_enabled": False, "top_overtime_holiday_driver": None,
+        }
+
+    summaries = [_compute_payroll_summary(supabase, bid, period_start, period_end) for bid in branch_ids]
+
+    total_pay = round(sum(s["total_pay"] for s in summaries), 2)
+    total_hours = round(sum(s["total_hours"] for s in summaries), 2)
+    employee_count = sum(s["employee_count"] for s in summaries)
+    engine_enabled = any(s["engine_enabled"] for s in summaries)
+
+    top_driver = None
+    top_extra = -1.0
+    for s in summaries:
+        for row in s["rows"]:
+            extra = float(row.get("overtime_pay") or 0) + float(row.get("holiday_pay") or 0)
+            if extra > top_extra:
+                top_extra = extra
+                top_driver = {"employee_name": row["employee_name"], "extra_pay": round(extra, 2)}
+    if top_driver and top_extra <= 0:
+        top_driver = None
+
+    return {
+        "period_start": period_start.isoformat(),
+        "period_end": period_end.isoformat(),
+        "total_payroll_cost": total_pay,
+        "total_hours": total_hours,
+        "employee_count": employee_count,
+        "engine_enabled": engine_enabled,
+        "top_overtime_holiday_driver": top_driver,
+    }
+
+
+def _sales_trend(supabase, branch_ids: list[str], days: int = 30) -> dict:
+    """Daily revenue + daily top product over a rolling window — one query
+    per table across the whole range/branch set (not one query per day),
+    same voided/owner-request exclusion _compute_branch_summary uses for
+    today's revenue in summary.py.
+    """
+    if not branch_ids:
+        return {"daily_revenue": [], "daily_top_product": []}
+
+    end = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+    start = end - timedelta(days=days)
+
+    transactions_result = (
+        supabase.table("transactions")
+        .select("id, total_amount, opened_at, is_owner_request")
+        .in_("branch_id", branch_ids)
+        .neq("status", "voided")
+        .gte("opened_at", start.isoformat())
+        .lt("opened_at", end.isoformat())
+        .execute()
+    )
+    transactions = [t for t in transactions_result.data if not t.get("is_owner_request")]
+
+    revenue_by_day: dict[str, float] = defaultdict(float)
+    txn_ids_by_day: dict[str, list[str]] = defaultdict(list)
+    for t in transactions:
+        day_key = datetime.fromisoformat(t["opened_at"]).astimezone(timezone.utc).date().isoformat()
+        revenue_by_day[day_key] += float(t["total_amount"])
+        txn_ids_by_day[day_key].append(t["id"])
+
+    all_txn_ids = [t["id"] for t in transactions]
+    items_by_txn: dict[str, list[dict]] = defaultdict(list)
+    product_names: dict[str, str] = {}
+    if all_txn_ids:
+        items_result = (
+            supabase.table("transaction_items")
+            .select("transaction_id, product_id, quantity")
+            .in_("transaction_id", all_txn_ids)
+            .execute()
+        )
+        for item in items_result.data:
+            items_by_txn[item["transaction_id"]].append(item)
+        product_ids = {item["product_id"] for item in items_result.data}
+        if product_ids:
+            products_result = supabase.table("products").select("id, name").in_("id", list(product_ids)).execute()
+            product_names = {p["id"]: p["name"] for p in products_result.data}
+
+    daily_revenue = []
+    daily_top_product = []
+    day = start.date()
+    while day < end.date():
+        key = day.isoformat()
+        daily_revenue.append({"date": key, "revenue": round(revenue_by_day.get(key, 0.0), 2)})
+
+        qty_by_product: dict[str, float] = defaultdict(float)
+        for txn_id in txn_ids_by_day.get(key, []):
+            for item in items_by_txn.get(txn_id, []):
+                qty_by_product[item["product_id"]] += float(item["quantity"])
+        if qty_by_product:
+            top_id, top_qty = max(qty_by_product.items(), key=lambda kv: kv[1])
+            daily_top_product.append({"date": key, "product": product_names.get(top_id, "Unknown"), "units": top_qty})
+
+        day += timedelta(days=1)
+
+    return {"daily_revenue": daily_revenue, "daily_top_product": daily_top_product}
+
+
+def _inventory_analysis(supabase, branch_ids: list[str], low_stock_limit: int = 15) -> dict:
+    """Total on-hand stock valuation + a bounded, worst-first low-stock list.
+    No summary function existed for inventory before this — list_inventory
+    in inventory.py is a raw passthrough with no aggregation.
+    """
+    if not branch_ids:
+        return {"total_valuation": 0, "low_stock_count": 0, "low_stock_items": []}
+
+    ingredients_result = (
+        supabase.table("ingredients")
+        .select("name, unit, unit_cost, current_stock, reorder_threshold")
+        .in_("branch_id", branch_ids)
+        .execute()
+    )
+    rows = ingredients_result.data
+    total_valuation = sum(float(r["current_stock"]) * float(r["unit_cost"]) for r in rows)
+
+    low_stock = [r for r in rows if float(r["current_stock"]) <= float(r["reorder_threshold"])]
+    low_stock.sort(key=lambda r: float(r["current_stock"]) - float(r["reorder_threshold"]))
+
+    return {
+        "total_valuation": round(total_valuation, 2),
+        "low_stock_count": len(low_stock),
+        "low_stock_items": [
+            {
+                "ingredient": r["name"],
+                "unit": r["unit"],
+                "current_stock": r["current_stock"],
+                "reorder_threshold": r["reorder_threshold"],
+            }
+            for r in low_stock[:low_stock_limit]
+        ],
+    }
+
+
 @router.post("/malaya/query", response_model=MalayaQueryResponse)
 def query_malaya(body: MalayaQueryRequest, user: CurrentUser = Depends(get_current_user)):
+    if user.role == "employee":
+        raise HTTPException(status_code=403, detail="Malaya is available to managers and executives only")
+
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
         raise HTTPException(status_code=503, detail="Malaya isn't configured (missing GROQ_API_KEY)")
@@ -223,6 +401,9 @@ def query_malaya(body: MalayaQueryRequest, user: CurrentUser = Depends(get_curre
         "best_seller_today": top_products[0] if top_products else None,
         "loss_analysis": _loss_analysis(supabase, branch_ids),
         "recent_losses": _recent_losses(supabase, branch_ids),
+        "payroll_analysis": _payroll_analysis(supabase, branch_ids),
+        "sales_trend_30d": _sales_trend(supabase, branch_ids),
+        "inventory_analysis": _inventory_analysis(supabase, branch_ids),
     }
 
     client = Groq(api_key=api_key)
