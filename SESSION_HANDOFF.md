@@ -23,7 +23,19 @@
 - Integration/UI (Playwright + API, throwaway data, self-cleaning): 84/84 (logins for all roles incl. dropdown, sale/kitchen/loss/count/utility, staff time in/out, procurement chain, logistics, CEO live view, permissions, concurrency) + kiosk UI 8/8.
 - `tsc --noEmit` in dashboard-web: the same 15 pre-existing errors, no new ones.
 
-### DEPLOY (manual, in this order; you need the `vince-tamis` Vercel team login)
+### LIVE (deployed 2026-09-21 to the `varix1` Vercel team as new projects)
+| Service | URL | Vercel project |
+|---|---|---|
+| API | https://smfc-api.vercel.app | `smfc-api` |
+| Dashboard | https://smfc-ims.vercel.app | `smfc-ims` |
+| Staff-clock kiosk | https://staff-clock-five.vercel.app | `staff-clock` |
+
+Note: `staff-clock.vercel.app` (no `-five`) belongs to someone else's app; do not use it.
+The API project has `SUPABASE_URL` / `SUPABASE_SECRET_KEY`; dashboard has `VITE_API_BASE_URL` (= the API above), `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`; kiosk has `VITE_API_BASE_URL`.
+The older deployments (`api-fastapi-omega`, `dashboard-web-two-sigma`, `staff-clock-omega`) are untouched and still run the old code.
+Verified live with Playwright: 83/83 integration checks + 8/8 kiosk checks.
+
+### DEPLOY (manual; the original projects need the `vince-tamis` Vercel team login)
 ```bash
 cd services/api-fastapi && vercel --prod     # API first: fixes 1-4, 6 and logistics permissions
 cd apps/dashboard-web   && vercel --prod     # new roles, login group, procurement/logistics pages, CEO tabs
