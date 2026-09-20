@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { BRANCH_CONFIG } from '@/lib/types';
+import { getBranchConfig } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { TrendingUp, TrendingDown, DollarSign, Package, AlertCircle } from 'lucide-react';
 
@@ -20,7 +20,7 @@ export default function ManagerDashboard() {
     );
   }
 
-  const branchConfig = BRANCH_CONFIG[user.branch];
+  const branchConfig = getBranchConfig(user.branch);
 
   // Mock data (PHP, Philippines-scoped menu)
   const metrics = {

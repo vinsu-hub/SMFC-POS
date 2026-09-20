@@ -1,5 +1,43 @@
 # SMFC POS — Session Handoff
 
+## 2026-09-21 update: merge of procurement / logistics + production fixes (branch `merge/procurement-logistics`)
+
+**Status:** code complete, tested locally against the shared Supabase project, **not deployed** (deploys are manual, see below). DB changes are already applied (migrations `0040`-`0045`; see `supabase/migrations/README.applied.md`).
+
+### New
+- **Roles + login:** `procurement`, `finance_admin`, `canvasser`, `logistics`. New "Head Office" group in the login dropdown (click to auto-fill, password `demo1234`): `procurement@corp.com`, `finance@corp.com`, `canvass@corp.com`, `logistics@corp.com` (seeded by `scripts/seed_demo.py`, already created on the live DB).
+- **Procurement chain** (pages `Procurement`, `Canvass`, `FinanceApprovals`, `RequestStock`; talks to Supabase directly via RLS + RPC, SQL in `0042`-`0044`): branch request -> canvass tickets -> quotes/suppliers -> PO (procurement + finance sign, printable) -> receiving with receipt photo -> stock + unit cost update. Employees/managers get **Request Stock** in their nav.
+- **Logistics desk** (`Logistics.tsx`): company-wide transfers, stock requests and dispatch over the existing FastAPI routers; `logistics` is now a company-wide role (`auth.is_company_wide`, used by transfers/stock-requests).
+- **CEO:** Command Center gains **Live Orders** (realtime, revenue/VAT/COGS/margin per order) and **Menu Costing**; per-sale cost snapshot (`transaction_items.unit_cogs`, migration `0045`).
+
+### Production bugs fixed (found by the integration suite)
+1. **Random 500s / false 401s ("Failed to load utility logs")** - the shared Supabase client used HTTP/2 and Cloudflare reset it under concurrent requests. `app/deps.py` now uses HTTP/1.1 with a pooled client + retries (480/480 parallel requests OK, was ~2.5% failing).
+2. **Saving electricity/water readings returned 500** - migration `0018` replaced the unique constraint with a partial index, which PostgREST `on_conflict` cannot target. `routers/utility.py` now does select-then-update/insert.
+3. **Staff clock: an already-clocked-in employee saw a blank screen and could not time out** - kiosk verify now returns the open attendance log; `staff-clock` uses it.
+4. **Executive Command Center took ~14s** (17 branches summarised one by one) - now concurrent (~4x faster).
+5. Header/Sidebar crashed for a branch whose `theme_key` is not in `BRANCH_CONFIG` - `getBranchConfig()` fallback.
+6. Stock-requests list ignored company-wide roles (only showed one branch).
+
+### Tests
+- `services/api-fastapi`: 36 passing (`uv run pytest --ignore=tests/test_malaya.py`), incl. new `tests/test_merge_changes.py`.
+- Integration/UI (Playwright + API, throwaway data, self-cleaning): 84/84 (logins for all roles incl. dropdown, sale/kitchen/loss/count/utility, staff time in/out, procurement chain, logistics, CEO live view, permissions, concurrency) + kiosk UI 8/8.
+- `tsc --noEmit` in dashboard-web: the same 15 pre-existing errors, no new ones.
+
+### DEPLOY (manual, in this order; you need the `vince-tamis` Vercel team login)
+```bash
+cd services/api-fastapi && vercel --prod     # API first: fixes 1-4, 6 and logistics permissions
+cd apps/dashboard-web   && vercel --prod     # new roles, login group, procurement/logistics pages, CEO tabs
+cd apps/staff-clock     && vercel --prod     # kiosk fix (3)
+```
+Env vars already exist on those projects; nothing new is required. Roll back by promoting the previous deployment in Vercel.
+
+### Notes / open items
+- `supabase/migrations/_applied_unused/` documents five migrations applied during an abandoned Supabase-only POS prototype (business days, `create_pos_transaction`, ...). Unused by this app; decide later whether to drop those DB objects.
+- `TrendAnalysis` and `HRFlags` still show sample data.
+- Rotate the DB password / secret key (they were pasted into a chat session).
+
+---
+
 **Date:** 2026-08-03 (Mon)
 **Branch:** `main` — **not yet committed** (this session's changes are on disk, uncommitted — see below)
 **Repo:** `https://github.com/vinsu-hub/SMFC-POS.git`

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSync } from '@/contexts/SyncContext';
-import { BRANCH_CONFIG } from '@/lib/types';
+import { getBranchConfig } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { LogOut, Menu, Settings } from 'lucide-react';
@@ -21,7 +21,7 @@ export function Header({ title, showLogo = true, onMenuClick }: HeaderProps) {
   if (!user) return null;
 
   const branchConfig = user.branch
-    ? BRANCH_CONFIG[user.branch]
+    ? getBranchConfig(user.branch)
     : { name: 'Corporate HQ', color: '#1B2A4A', logoUrl: undefined as string | undefined };
 
   const getSyncDotColor = () => {

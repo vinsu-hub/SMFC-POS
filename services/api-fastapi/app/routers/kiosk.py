@@ -101,9 +101,11 @@ def kiosk_verify(body: KioskVerifyRequest):
     auto_close_stale_attendance(branch_id)
 
     open_row = _get_open_attendance(profile["id"])
+    attendance_log = None
     if open_row:
         today_status = open_row["status"]
         attendance_log_id = open_row["id"]
+        attendance_log = open_row
     elif _get_completed_today(profile["id"]):
         today_status = "completed"
         attendance_log_id = None
@@ -119,6 +121,7 @@ def kiosk_verify(body: KioskVerifyRequest):
         "branch_id": branch_id,
         "today_status": today_status,
         "attendance_log_id": attendance_log_id,
+        "attendance_log": attendance_log,
     }
 
 

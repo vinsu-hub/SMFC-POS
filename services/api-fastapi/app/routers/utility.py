@@ -107,23 +107,33 @@ def create_utility_log(
             .execute()
         )
     else:
-        # Upsert: insert or update the record for this branch/utility/date
-        result = (
+        # One row per branch/utility/date for meter readings (electricity/water). The database enforces
+        # this with a *partial* unique index (migration 0018), which PostgREST's on_conflict upsert
+        # cannot target (error 42P10), so do the select-then-update/insert explicitly.
+        payload = {
+            "branch_id": body.branch_id,
+            "utility_type": body.utility_type,
+            "business_date": body.business_date.isoformat(),
+            "reading_start": body.reading_start,
+            "reading_end": body.reading_end,
+            "unit_cost": body.unit_cost,
+            "recorded_by": body.recorded_by,
+        }
+        existing = (
             supabase.table("utility_logs")
-            .upsert(
-                {
-                    "branch_id": body.branch_id,
-                    "utility_type": body.utility_type,
-                    "business_date": body.business_date.isoformat(),
-                    "reading_start": body.reading_start,
-                    "reading_end": body.reading_end,
-                    "unit_cost": body.unit_cost,
-                    "recorded_by": body.recorded_by,
-                },
-                on_conflict="branch_id,utility_type,business_date",
-            )
+            .select("id")
+            .eq("branch_id", body.branch_id)
+            .eq("utility_type", body.utility_type)
+            .eq("business_date", body.business_date.isoformat())
+            .limit(1)
             .execute()
         )
+        if existing.data:
+            result = (
+                supabase.table("utility_logs").update(payload).eq("id", existing.data[0]["id"]).execute()
+            )
+        else:
+            result = supabase.table("utility_logs").insert(payload).execute()
     return result.data[0]
 
 

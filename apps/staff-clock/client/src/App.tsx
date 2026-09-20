@@ -197,7 +197,7 @@ export default function App() {
     dispatch({ type: 'VERIFY_START' });
     try {
       const employee = await kioskVerify(employeeNumber, state.pin, kioskId.current);
-      dispatch({ type: 'VERIFIED', employee, log: null });
+      dispatch({ type: 'VERIFIED', employee, log: employee.attendance_log ?? null });
     } catch (err) {
       dispatch({ type: 'VERIFY_ERROR', error: err instanceof Error ? err.message : 'Verification failed' });
     }

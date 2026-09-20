@@ -21,7 +21,7 @@ import {
   getLossPhotoUrl,
   uploadLossPhoto,
 } from '@/lib/api';
-import { BRANCH_CONFIG } from '@/lib/types';
+import { getBranchConfig } from '@/lib/types';
 
 const REASONS: { value: LossReason; label: string }[] = [
   { value: 'spoilage', label: 'Spoilage' },
@@ -269,7 +269,7 @@ export default function LossLog() {
         {/* Loss Table */}
         <Card
           className="border-l-4"
-          style={{ borderLeftColor: user?.branch ? BRANCH_CONFIG[user.branch].color : '#B5651D' }}
+          style={{ borderLeftColor: user?.branch ? getBranchConfig(user.branch).color : '#B5651D' }}
         >
           <CardHeader>
             <CardTitle className="font-corp-display">Loss Log</CardTitle>

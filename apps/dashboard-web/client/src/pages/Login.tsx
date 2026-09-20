@@ -66,6 +66,14 @@ export default function Login() {
     { name: 'Executive - Operations', email: 'ops@corp.com', role: 'executive' },
   ];
 
+  // Company-wide procurement chain accounts (seeded by scripts/seed_demo.py)
+  const headOfficeAccounts = [
+    { name: 'Procurement Head', email: 'procurement@corp.com', role: 'Procurement' },
+    { name: 'Finance Admin', email: 'finance@corp.com', role: 'Finance admin' },
+    { name: 'Canvass Personnel', email: 'canvass@corp.com', role: 'Canvass' },
+    { name: 'Logistics', email: 'logistics@corp.com', role: 'Logistics' },
+  ];
+
   const handleSelectAccount = (accountEmail: string) => {
     setEmail(accountEmail);
     setPassword('demo1234');
@@ -234,6 +242,57 @@ export default function Login() {
                           <code className="text-xs text-muted-foreground">{account.email}</code>
                         </div>
                         <span className="text-xs font-corp-body px-2.5 py-1 bg-accent-soft rounded-2xl text-accent-foreground capitalize">
+                          {account.role}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Head Office (procurement chain) Accounts */}
+            <div className="rounded-lg overflow-hidden shadow-l2-raised mt-3">
+              <button
+                type="button"
+                onClick={() =>
+                  setExpandedBranch(expandedBranch === 'headoffice' ? null : 'headoffice')
+                }
+                className="w-full flex items-center justify-between p-3 bg-card hover:bg-accent transition-colors"
+                style={{ borderLeft: '4px solid var(--ws-color-warning)' }}
+              >
+                <div className="text-left">
+                  <p className="font-corp-display font-semibold text-foreground text-sm">
+                    Head Office (Procurement, Finance, Canvass, Logistics)
+                  </p>
+                  <p className="text-xs text-muted-foreground font-corp-body">
+                    {headOfficeAccounts.length} accounts
+                  </p>
+                </div>
+                {expandedBranch === 'headoffice' ? (
+                  <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                )}
+              </button>
+
+              {expandedBranch === 'headoffice' && (
+                <div className="bg-card border-t border-border space-y-2 p-3">
+                  {headOfficeAccounts.map((account) => (
+                    <button
+                      key={account.email}
+                      type="button"
+                      onClick={() => handleSelectAccount(account.email)}
+                      className="w-full text-left p-2 rounded-md hover:bg-accent transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-corp-body font-medium text-foreground">
+                            {account.name}
+                          </p>
+                          <code className="text-xs text-muted-foreground">{account.email}</code>
+                        </div>
+                        <span className="text-xs font-corp-body px-2.5 py-1 bg-accent-soft rounded-2xl text-accent-foreground">
                           {account.role}
                         </span>
                       </div>

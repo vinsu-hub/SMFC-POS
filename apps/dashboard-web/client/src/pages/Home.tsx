@@ -21,6 +21,14 @@ export default function Home() {
       navigate('/dashboard');
     } else if (user?.role === 'executive') {
       navigate('/command-center');
+    } else if (user?.role === 'procurement') {
+      navigate('/procurement');
+    } else if (user?.role === 'canvasser') {
+      navigate('/canvass');
+    } else if (user?.role === 'finance_admin') {
+      navigate('/finance');
+    } else if (user?.role === 'logistics') {
+      navigate('/logistics');
     }
   }, [isAuthenticated, user, loading, navigate]);
 

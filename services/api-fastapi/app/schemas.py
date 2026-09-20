@@ -565,6 +565,8 @@ class KioskVerifyResponse(BaseModel):
     branch_id: str
     today_status: Literal["not_started", "working", "on_break", "completed"]
     attendance_log_id: str | None = None
+    # The open shift, so the kiosk can show Break / End Today's Work for someone already clocked in.
+    attendance_log: AttendanceLogResponse | None = None
 
 
 class KioskClockInRequest(BaseModel):

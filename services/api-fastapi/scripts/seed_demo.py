@@ -16,6 +16,12 @@ import bcrypt
 from app.deps import get_supabase
 
 DEMO_PASSWORD = "demo1234"
+HEAD_OFFICE_ACCOUNTS = [
+    ("procurement@corp.com", "procurement", "Procurement Head", "EMP-9101"),
+    ("finance@corp.com", "finance_admin", "Finance Admin", "EMP-9102"),
+    ("canvass@corp.com", "canvasser", "Canvass Personnel", "EMP-9103"),
+    ("logistics@corp.com", "logistics", "Logistics", "EMP-9104"),
+]
 DEMO_PIN = "1234"
 
 supabase = get_supabase()
@@ -386,6 +392,11 @@ def main():
     upsert_user("exec@corp.com", "executive", None, "Corporate Executive", "EMP-9001")
     upsert_user("ops@corp.com", "executive", None, "Operations Executive", "EMP-9002")
     employee_numbers.extend(["EMP-9001", "EMP-9002"])
+
+    # Head-office procurement chain (company-wide, not tied to a branch).
+    for email, role, name, number in HEAD_OFFICE_ACCOUNTS:
+        upsert_user(email, role, None, name, number)
+        employee_numbers.append(number)
 
     print("Seed complete.")
     print(f"Organization: {org['id']}")

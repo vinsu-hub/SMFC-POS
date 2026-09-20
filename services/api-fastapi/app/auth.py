@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 
 import bcrypt
@@ -7,6 +8,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.deps import get_supabase
 
 bearer_scheme = HTTPBearer(auto_error=False)
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -32,7 +34,8 @@ def get_current_user(
     supabase = get_supabase()
     try:
         auth_response = supabase.auth.get_user(credentials.credentials)
-    except Exception:
+    except Exception as exc:
+        logger.warning("auth.get_user failed: %s: %s", type(exc).__name__, exc)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
     if not auth_response or not auth_response.user:
@@ -53,9 +56,17 @@ def get_current_user(
     )
 
 
+# Roles that operate across every branch instead of being scoped to one.
+COMPANY_WIDE_ROLES = frozenset({"executive", "logistics"})
+
+
+def is_company_wide(user: CurrentUser) -> bool:
+    return user.role in COMPANY_WIDE_ROLES
+
+
 def require_branch_access(user: CurrentUser, branch_id: str) -> None:
-    """Executives can act on any branch; everyone else only their own."""
-    if user.role == "executive":
+    """Executives and logistics can act on any branch; everyone else only their own."""
+    if is_company_wide(user):
         return
     if user.branch_id != branch_id:
         raise HTTPException(

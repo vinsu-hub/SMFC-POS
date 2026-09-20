@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.auth import CurrentUser, get_current_user, require_branch_access
+from app.auth import CurrentUser, get_current_user, is_company_wide, require_branch_access
 from app.deps import get_supabase
 from app.routers.transfers import _do_transfer
 from app.schemas import StockRequestCreate, StockRequestResponse
@@ -58,13 +58,10 @@ def list_stock_requests(
 ):
     """List requests where branch is either the requester or the source."""
     supabase = get_supabase()
-    if user.role != "executive":
+    query = supabase.table("stock_requests").select(_SELECT)
+    if not is_company_wide(user):
         require_branch_access(user, branch_id)
-    query = (
-        supabase.table("stock_requests")
-        .select(_SELECT)
-        .or_(f"requesting_branch_id.eq.{branch_id},source_branch_id.eq.{branch_id}")
-    )
+        query = query.or_(f"requesting_branch_id.eq.{branch_id},source_branch_id.eq.{branch_id}")
     if status:
         query = query.eq("status", status)
     result = query.order("created_at", desc=True).execute()
@@ -89,7 +86,7 @@ def fulfill_stock_request(
     supabase = get_supabase()
     stock_request = _get_request_or_404(supabase, request_id)
 
-    if stock_request["source_branch_id"] != user.branch_id and user.role != "executive":
+    if stock_request["source_branch_id"] != user.branch_id and not is_company_wide(user):
         raise HTTPException(status_code=403, detail="Only the source branch can fulfill this request")
     if stock_request["status"] != "pending":
         raise HTTPException(status_code=400, detail=f"Request already {stock_request['status']}")
@@ -119,7 +116,7 @@ def decline_stock_request(
     supabase = get_supabase()
     stock_request = _get_request_or_404(supabase, request_id)
 
-    if stock_request["source_branch_id"] != user.branch_id and user.role != "executive":
+    if stock_request["source_branch_id"] != user.branch_id and not is_company_wide(user):
         raise HTTPException(status_code=403, detail="Only the source branch can decline this request")
     if stock_request["status"] != "pending":
         raise HTTPException(status_code=400, detail=f"Request already {stock_request['status']}")

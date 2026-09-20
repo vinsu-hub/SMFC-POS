@@ -25,7 +25,14 @@ export type Branch =
 
 export type CompanyKey = 'danielito' | 'malaya' | 'dden' | 'dvenue' | 'isabelas';
 
-export type Role = 'employee' | 'manager' | 'executive';
+export type Role =
+  | 'employee'
+  | 'manager'
+  | 'executive'
+  | 'procurement'
+  | 'finance_admin'
+  | 'canvasser'
+  | 'logistics';
 
 export interface User {
   id: string;
@@ -288,6 +295,25 @@ export const BRANCH_CONFIG: Record<
     ];
   })
 ) as Record<Branch, (typeof COMPANY_THEME)[CompanyKey] & { name: string; city: string; companyKey: CompanyKey }>;
+
+/** Branch styling with a safe fallback: a branch whose theme_key isn't in BRANCH_CONFIG yet (new branch,
+ *  test data) must not crash the header/sidebar. */
+export function getBranchConfig(branch: string | null | undefined) {
+  const found = branch ? (BRANCH_CONFIG as Record<string, (typeof BRANCH_CONFIG)[Branch]>)[branch] : undefined;
+  return (
+    found ?? {
+      name: 'Branch',
+      city: '',
+      companyKey: 'danielito' as CompanyKey,
+      color: '#14524B',
+      accentColor: '#C9A24B',
+      displayFont: '',
+      bodyFont: '',
+      theme: 'light' as const,
+      logoUrl: '',
+    }
+  );
+}
 
 export function getCompanyKey(branch: Branch): CompanyKey {
   return BRANCH_CONFIG[branch].companyKey;

@@ -29,6 +29,11 @@ import HRPayroll from "./pages/HRPayroll";
 import HolidayCalendar from "./pages/HolidayCalendar";
 import PayrollSettings from "./pages/PayrollSettings";
 import NotFound from "./pages/NotFound";
+import Procurement from "./pages/Procurement";
+import Canvass from "./pages/Canvass";
+import FinanceApprovals from "./pages/FinanceApprovals";
+import RequestStock from "./pages/RequestStock";
+import Logistics from "./pages/Logistics";
 
 function Router() {
   return (
@@ -54,6 +59,11 @@ function Router() {
       <Route path={"/hr/holiday-calendar"} component={HolidayCalendar} />
       <Route path={"/hr/payroll-settings"} component={PayrollSettings} />
       <Route path={"/settings"} component={Settings} />
+      <Route path={"/request-stock"} component={RequestStock} />
+      <Route path={"/procurement"} component={Procurement} />
+      <Route path={"/canvass"} component={Canvass} />
+      <Route path={"/finance"} component={FinanceApprovals} />
+      <Route path={"/logistics"} component={Logistics} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

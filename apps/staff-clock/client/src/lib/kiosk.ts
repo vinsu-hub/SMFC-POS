@@ -12,6 +12,8 @@ export interface KioskVerifyResult {
   branch_id: string;
   today_status: TodayStatus;
   attendance_log_id: string | null;
+  /** The open shift (present when today_status is working / on_break). */
+  attendance_log?: AttendanceLog | null;
 }
 
 export interface AttendanceLog {

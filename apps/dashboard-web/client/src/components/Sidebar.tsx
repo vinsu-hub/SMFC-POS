@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'wouter';
-import { BRANCH_CONFIG } from '@/lib/types';
+import { getBranchConfig } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   BarChart3,
@@ -27,6 +27,8 @@ import {
   Percent,
   CalendarDays,
   ChefHat,
+  Receipt,
+  Search,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -43,12 +45,16 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
   if (!user) return null;
 
   const branchConfig = user.branch
-    ? BRANCH_CONFIG[user.branch]
+    ? getBranchConfig(user.branch)
     : { name: 'Corporate HQ', color: '#1B2A4A', logoUrl: undefined as string | undefined };
 
   const isEmployee = user.role === 'employee';
   const isManager = user.role === 'manager';
   const isExecutive = user.role === 'executive';
+  const isProcurement = user.role === 'procurement';
+  const isCanvasser = user.role === 'canvasser';
+  const isFinance = user.role === 'finance_admin';
+  const isLogistics = user.role === 'logistics';
 
   const navItems = [
     // Common items
@@ -61,6 +67,7 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
           { icon: AlertCircle, label: 'Log Loss', href: '/loss-log', show: true },
           { icon: Truck, label: 'Inventory Movements', href: '/inventory-movements', show: true },
           { icon: Zap, label: 'Utility Log', href: '/utility-log', show: true },
+          { icon: ClipboardList, label: 'Request Stock', href: '/request-stock', show: true },
           { icon: MessageSquare, label: 'Newsfeed', href: '/newsfeed', show: true },
         ]
       : []),
@@ -73,6 +80,7 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
           { icon: AlertCircle, label: 'Loss Log', href: '/loss-log', show: true },
           { icon: Truck, label: 'Inventory Movements', href: '/inventory-movements', show: true },
           { icon: Zap, label: 'Utility Log', href: '/utility-log', show: true },
+          { icon: ClipboardList, label: 'Request Stock', href: '/request-stock', show: true },
           { icon: Users, label: 'HR Management', href: '/hr/attendance', show: true },
           { icon: Wallet, label: 'Payroll', href: '/hr/payroll', show: true },
           { icon: CalendarDays, label: 'Holiday Calendar', href: '/hr/holiday-calendar', show: true },
@@ -90,6 +98,16 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
           { icon: Wallet, label: 'Payroll', href: '/hr/payroll', show: true },
           { icon: CalendarDays, label: 'Holiday Calendar', href: '/hr/holiday-calendar', show: true },
           { icon: MessageSquare, label: 'Newsfeed', href: '/newsfeed', show: true },
+        ]
+      : []),
+    ...(isExecutive ? [{ icon: Receipt, label: 'Purchase Orders', href: '/finance', show: true }] : []),
+    ...(isProcurement ? [{ icon: ClipboardList, label: 'Procurement', href: '/procurement', show: true }] : []),
+    ...(isCanvasser ? [{ icon: Search, label: 'Canvass', href: '/canvass', show: true }] : []),
+    ...(isFinance ? [{ icon: Receipt, label: 'PO Approvals', href: '/finance', show: true }] : []),
+    ...(isLogistics
+      ? [
+          { icon: Truck, label: 'Logistics', href: '/logistics', show: true },
+          { icon: Package, label: 'Inventory Movements', href: '/inventory-movements', show: true },
         ]
       : []),
     { icon: Settings, label: 'Settings', href: '/settings', show: true },

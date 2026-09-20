@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { LiveOrders } from '@/components/LiveOrders';
+import { MenuCosting } from '@/components/MenuCosting';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { BRANCH_CONFIG, COMPANY_THEME, getCompanyKey, type Branch, type CompanyKey } from '@/lib/types';
@@ -398,7 +400,7 @@ export default function CommandCenter() {
     <DashboardLayout title="Command Center">
       <div className="p-6 space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-7 mb-6">
+          <TabsList className="flex w-full flex-wrap h-auto gap-1 mb-6">
             <TabsTrigger value="overview" className="font-corp-body">
               Overview
             </TabsTrigger>
@@ -409,6 +411,12 @@ export default function CommandCenter() {
             ))}
             <TabsTrigger value="utility-monitor" className="font-corp-body">
               Utility Monitor
+            </TabsTrigger>
+            <TabsTrigger value="live-orders" className="font-corp-body">
+              Live Orders
+            </TabsTrigger>
+            <TabsTrigger value="menu-costing" className="font-corp-body">
+              Menu Costing
             </TabsTrigger>
           </TabsList>
 
@@ -820,6 +828,13 @@ export default function CommandCenter() {
                 </Table>
               </CardContent>
             </Card>
+          </TabsContent>
+        
+          <TabsContent value="live-orders">
+            <LiveOrders />
+          </TabsContent>
+          <TabsContent value="menu-costing">
+            <MenuCosting />
           </TabsContent>
         </Tabs>
       </div>

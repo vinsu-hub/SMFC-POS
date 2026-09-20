@@ -1,4 +1,5 @@
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -127,7 +128,12 @@ def get_branch_summary(branch_id: str, user: CurrentUser = Depends(get_current_u
 
 
 def _compute_organization_summary(supabase, organization_id: str, branches: list[dict]) -> OrganizationSummary:
-    branch_summaries = [_compute_branch_summary(supabase, b["id"], b["name"]) for b in branches]
+    # Each branch needs several sequential queries; run the branches concurrently (I/O-bound) instead of
+    # one after another, which made the Executive Overview take ~14s on production with 17 branches.
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        branch_summaries = list(
+            pool.map(lambda b: _compute_branch_summary(supabase, b["id"], b["name"]), branches)
+        )
 
     total_revenue = round(sum(b.revenue for b in branch_summaries), 2)
     total_cogs = round(sum(b.cogs for b in branch_summaries), 2)

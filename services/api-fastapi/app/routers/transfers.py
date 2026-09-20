@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from datetime import datetime
 
-from app.auth import CurrentUser, get_current_user, require_branch_access
+from app.auth import CurrentUser, get_current_user, is_company_wide, require_branch_access
 from app.deps import get_supabase
 from app.schemas import TransferCreate, TransferResponse
 
@@ -111,7 +111,7 @@ def list_transfers(
     supabase = get_supabase()
     select = "*, ingredient:ingredients(name), initiator:profiles!initiated_by(full_name)"
     # Executive can see all
-    if user.role == "executive":
+    if is_company_wide(user):
         query = supabase.table("transfers").select(select)
     else:
         require_branch_access(user, branch_id)
@@ -144,7 +144,7 @@ def get_transfer(
     transfer = result.data
 
     # Check access
-    if user.role != "executive":
+    if not is_company_wide(user):
         if transfer["from_branch_id"] != user.branch_id and transfer["to_branch_id"] != user.branch_id:
             raise HTTPException(status_code=403, detail="Access denied")
     return transfer
@@ -169,7 +169,7 @@ def confirm_transfer(
         raise HTTPException(status_code=404, detail="Transfer not found")
     transfer = transfer_result.data
 
-    if transfer["to_branch_id"] != user.branch_id and user.role != "executive":
+    if transfer["to_branch_id"] != user.branch_id and not is_company_wide(user):
         raise HTTPException(status_code=403, detail="Only destination branch can confirm")
 
     if transfer["status"] != "pending":
@@ -272,7 +272,7 @@ def reject_transfer(
         raise HTTPException(status_code=404, detail="Transfer not found")
     transfer = transfer_result.data
 
-    if transfer["to_branch_id"] != user.branch_id and user.role != "executive":
+    if transfer["to_branch_id"] != user.branch_id and not is_company_wide(user):
         raise HTTPException(status_code=403, detail="Only destination branch can reject")
 
     if transfer["status"] != "pending":
