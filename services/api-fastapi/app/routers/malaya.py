@@ -14,7 +14,36 @@ from app.schemas import MalayaQueryRequest, MalayaQueryResponse
 
 router = APIRouter(tags=["malaya"])
 
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+
+MAX_CONTEXT_CHARS = int(os.environ.get("MALAYA_MAX_CONTEXT_CHARS", "12000"))
+
+
+def _fit_context(context: dict, max_chars: int = MAX_CONTEXT_CHARS) -> str:
+    """Serialize compactly and, if still too large for the model's token limit, halve the biggest list until it fits."""
+    def dump() -> str:
+        return json.dumps(context, default=str, separators=(",", ":"))
+
+    def biggest_list(node, best=None):
+        if isinstance(node, dict):
+            for v in node.values():
+                best = biggest_list(v, best)
+        elif isinstance(node, list):
+            if len(node) > 1 and (best is None or len(json.dumps(node, default=str)) > len(json.dumps(best, default=str))):
+                best = node
+            for v in node:
+                best = biggest_list(v, best)
+        return best
+
+    text = dump()
+    while len(text) > max_chars:
+        target = biggest_list(context)
+        if target is None:
+            break
+        del target[len(target) // 2:]
+        text = dump()
+    return text
+
 
 SYSTEM_PROMPT = """You are Malaya, the AI business analyst for Saint Michael Food Corp,
 a multi-branch restaurant group. You answer questions about the branch(es) the
@@ -508,7 +537,7 @@ def query_malaya(body: MalayaQueryRequest, user: CurrentUser = Depends(get_curre
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {
                     "role": "user",
-                    "content": f"DATA:\n{json.dumps(context, default=str)}\n\nQUESTION: {body.question}",
+                    "content": f"DATA:\n{_fit_context(context)}\n\nQUESTION: {body.question}",
                 },
             ],
         )
