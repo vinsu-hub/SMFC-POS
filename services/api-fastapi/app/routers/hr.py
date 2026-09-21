@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from datetime import date, datetime, timezone
 from typing import Optional
 
-from app.auth import CurrentUser, get_current_user, require_branch_access
+from app.auth import CurrentUser, get_current_user, is_executive_like, is_manager_plus, require_branch_access
 from app.deps import get_supabase
 from app.attendance_utils import auto_close_stale_attendance, compute_attendance_breakdown, compute_hours_worked, hr_table
 from app.payroll_pdf import build_payslip_pdf
@@ -52,7 +52,7 @@ def clock_in(
 ):
     """Employee clocks in for their shift."""
     # Employee can only clock in for themselves (unless manager/executive)
-    if body.employee_id != user.id and user.role not in ("manager", "executive"):
+    if body.employee_id != user.id and not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Cannot clock in another employee")
 
     require_branch_access(user, body.branch_id)
@@ -93,7 +93,7 @@ def clock_out(
     body: ClockOutRequest, user: CurrentUser = Depends(get_current_user)
 ):
     """Employee clocks out."""
-    if body.employee_id != user.id and user.role not in ("manager", "executive"):
+    if body.employee_id != user.id and not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Cannot clock out another employee")
 
     # Find open attendance log
@@ -168,7 +168,7 @@ def get_branch_attendance(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Manager/Executive view of branch attendance."""
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
     if user.role == "manager":
         require_branch_access(user, branch_id)
@@ -383,7 +383,7 @@ def get_payroll_summary(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Preview payroll for a branch over a date range (not persisted)."""
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
     if user.role == "manager":
         require_branch_access(user, branch_id)
@@ -579,7 +579,7 @@ def get_payroll_receipt_pdf(
     branch, so an executive printing another branch's receipt gets that
     branch's real name rather than their own.
     """
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
     if user.role == "manager":
         require_branch_access(user, branch_id)
@@ -644,7 +644,7 @@ def get_payroll_receipts_zip(
     replaces the old client-side loop that opened a window.open popup per
     employee, which browsers block after the first one in the same tick.
     """
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
     if user.role == "manager":
         require_branch_access(user, branch_id)
@@ -701,7 +701,7 @@ def generate_payroll(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Generate and persist a payroll run for a branch/period."""
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
     if user.role == "manager":
         require_branch_access(user, body.branch_id)
@@ -766,7 +766,7 @@ def list_payroll_records(
     user: CurrentUser = Depends(get_current_user),
 ):
     """List past payroll runs for a branch."""
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
     if user.role == "manager":
         require_branch_access(user, branch_id)
@@ -802,7 +802,7 @@ def get_payroll_for_print(
         raise HTTPException(status_code=404, detail="Payroll record not found")
     record = record_result.data
 
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
     if user.role == "manager":
         require_branch_access(user, record["branch_id"])
@@ -853,7 +853,7 @@ def list_holidays(
     branch_id: str | None = Query(None),
     user: CurrentUser = Depends(get_current_user),
 ):
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
 
     result = (
@@ -874,7 +874,7 @@ def list_holidays(
 
 @router.post("/hr/holidays", response_model=HolidayResponse)
 def create_holiday(body: HolidayCreate, user: CurrentUser = Depends(get_current_user)):
-    if user.role != "executive":
+    if not is_executive_like(user):
         raise HTTPException(status_code=403, detail="Executive access required")
 
     payload = body.model_dump(mode="json")
@@ -886,7 +886,7 @@ def create_holiday(body: HolidayCreate, user: CurrentUser = Depends(get_current_
 
 @router.patch("/hr/holidays/{holiday_id}", response_model=HolidayResponse)
 def update_holiday(holiday_id: str, body: HolidayUpdate, user: CurrentUser = Depends(get_current_user)):
-    if user.role != "executive":
+    if not is_executive_like(user):
         raise HTTPException(status_code=403, detail="Executive access required")
 
     existing = hr_table("holidays").select("*").eq("id", holiday_id).maybe_single().execute()
@@ -902,7 +902,7 @@ def update_holiday(holiday_id: str, body: HolidayUpdate, user: CurrentUser = Dep
 
 @router.delete("/hr/holidays/{holiday_id}")
 def delete_holiday(holiday_id: str, user: CurrentUser = Depends(get_current_user)):
-    if user.role != "executive":
+    if not is_executive_like(user):
         raise HTTPException(status_code=403, detail="Executive access required")
 
     existing = hr_table("holidays").select("*").eq("id", holiday_id).maybe_single().execute()
@@ -919,7 +919,7 @@ def delete_holiday(holiday_id: str, user: CurrentUser = Depends(get_current_user
 
 @router.get("/hr/pay-rules", response_model=list[PayMultiplierRuleResponse])
 def list_pay_rules(user: CurrentUser = Depends(get_current_user)):
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
     result = hr_table("pay_multiplier_rules").select("*").order("scenario_key").execute()
     return result.data
@@ -927,7 +927,7 @@ def list_pay_rules(user: CurrentUser = Depends(get_current_user)):
 
 @router.patch("/hr/pay-rules/{scenario_key}", response_model=PayMultiplierRuleResponse)
 def update_pay_rule(scenario_key: str, body: PayMultiplierRuleUpdate, user: CurrentUser = Depends(get_current_user)):
-    if user.role != "executive":
+    if not is_executive_like(user):
         raise HTTPException(status_code=403, detail="Executive access required")
 
     existing = hr_table("pay_multiplier_rules").select("*").eq("scenario_key", scenario_key).maybe_single().execute()
@@ -945,7 +945,7 @@ def update_pay_rule(scenario_key: str, body: PayMultiplierRuleUpdate, user: Curr
 
 @router.get("/hr/payroll-settings", response_model=PayrollRuleSettingsResponse)
 def get_payroll_settings(user: CurrentUser = Depends(get_current_user)):
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
     result = (
         hr_table("payroll_rule_settings")
@@ -959,7 +959,7 @@ def get_payroll_settings(user: CurrentUser = Depends(get_current_user)):
 
 @router.patch("/hr/payroll-settings", response_model=PayrollRuleSettingsResponse)
 def update_payroll_settings(body: PayrollRuleSettingsUpdate, user: CurrentUser = Depends(get_current_user)):
-    if user.role != "executive":
+    if not is_executive_like(user):
         raise HTTPException(status_code=403, detail="Executive access required")
 
     existing = hr_table("payroll_rule_settings").select("*").limit(1).maybe_single().execute()
@@ -980,7 +980,7 @@ def update_payroll_settings(body: PayrollRuleSettingsUpdate, user: CurrentUser =
 
 @router.post("/hr/payroll-overrides", response_model=PayrollOverrideResponse)
 def create_payroll_override(body: PayrollOverrideCreate, user: CurrentUser = Depends(get_current_user)):
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
 
     log_result = hr_table("attendance_logs").select("*").eq("id", body.attendance_log_id).maybe_single().execute()
@@ -1007,7 +1007,7 @@ def create_payroll_override(body: PayrollOverrideCreate, user: CurrentUser = Dep
 
 @router.patch("/hr/payroll-overrides/{override_id}/approve", response_model=PayrollOverrideResponse)
 def approve_payroll_override(override_id: str, user: CurrentUser = Depends(get_current_user)):
-    if user.role != "executive":
+    if not is_executive_like(user):
         raise HTTPException(status_code=403, detail="Executive access required")
 
     existing = hr_table("payroll_overrides").select("*").eq("id", override_id).maybe_single().execute()
@@ -1032,7 +1032,7 @@ def list_payroll_audit_log(
     limit: int = Query(100, le=500),
     user: CurrentUser = Depends(get_current_user),
 ):
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
 
     query = hr_table("payroll_audit_log").select("*")
@@ -1068,7 +1068,7 @@ def get_employees(
     user: CurrentUser = Depends(get_current_user),
 ):
     """List employees for a branch (manager/executive)."""
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
     if user.role == "manager":
         require_branch_access(user, branch_id)
@@ -1098,7 +1098,7 @@ def create_employee(
     scripts/seed_demo.py's upsert_user (get_supabase() is a service-role
     client with .auth.admin access from a router the same as from a script).
     """
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
     require_branch_access(user, body.branch_id)
 
@@ -1178,7 +1178,7 @@ def update_employee(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Update employee pay rate, position, etc."""
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
 
     supabase = get_supabase()
@@ -1212,7 +1212,7 @@ def get_hr_flags(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Get HR flags (manager/executive)."""
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
 
     query = hr_table("hr_flags").select("*")
@@ -1235,7 +1235,7 @@ def create_hr_flag(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Create an HR flag (manager/executive)."""
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
 
     branch_id = body.get("branch_id")
@@ -1263,7 +1263,7 @@ def resolve_hr_flag(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Mark an HR flag as resolved."""
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
 
     result = (
@@ -1282,7 +1282,7 @@ def set_employee_pin(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Manager/executive sets or resets an employee's kiosk PIN."""
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
 
     supabase = get_supabase()

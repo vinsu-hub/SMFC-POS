@@ -11,7 +11,7 @@ import { LiveOrders } from '@/components/LiveOrders';
 import { MenuCosting } from '@/components/MenuCosting';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
-import { BRANCH_CONFIG, COMPANY_THEME, getCompanyKey, type Branch, type CompanyKey } from '@/lib/types';
+import { BRANCH_CONFIG, COMPANY_THEME, getCompanyKey, type Branch, type CompanyKey, isExecutiveLike } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
 import { ApiOrganizationSummary, fetchMyOrganizationSummary } from '@/lib/api';
 import { ApiUtilitySummary, ApiBranch, fetchOrgUtilitySummary, fetchTransfers, fetchBranches } from '@/lib/api';
@@ -245,7 +245,7 @@ export default function CommandCenter() {
   });
   const [utilityPeriodEnd, setUtilityPeriodEnd] = useState(() => new Date().toISOString().split('T')[0]);
 
-  const isExecutive = user?.role === 'executive';
+  const isExecutive = isExecutiveLike(user?.role);
 
   useEffect(() => {
     if (!isExecutive) return;
@@ -317,7 +317,7 @@ export default function CommandCenter() {
     };
   }, [isExecutive, summary, utilityPeriodStart, utilityPeriodEnd]);
 
-  if (!user || user.role !== 'executive') {
+  if (!user || !isExecutiveLike(user?.role)) {
     return (
       <DashboardLayout>
         <div className="p-6 text-center">

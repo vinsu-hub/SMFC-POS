@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation } from 'wouter';
-import { getBranchConfig } from '@/lib/types';
+import { getBranchConfig, isExecutiveLike } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
   BarChart3,
@@ -50,7 +50,7 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
 
   const isEmployee = user.role === 'employee';
   const isManager = user.role === 'manager';
-  const isExecutive = user.role === 'executive';
+  const isExecutive = isExecutiveLike(user.role);
   const isProcurement = user.role === 'procurement';
   const isCanvasser = user.role === 'canvasser';
   const isFinance = user.role === 'finance_admin';
@@ -74,7 +74,9 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
     ...(isManager
       ? [
           { icon: BarChart3, label: 'EOD Dashboard', href: '/dashboard', show: true },
+          { icon: ShoppingCart, label: 'POS Terminal', href: '/pos', show: true },
           { icon: ListOrdered, label: 'Order Queue', href: '/order-queue', show: true },
+          { icon: ChefHat, label: 'Kitchen Display', href: '/kitchen-display', show: true },
           { icon: Percent, label: 'POS Management', href: '/pos-management', show: true },
           { icon: Package, label: 'Inventory Count', href: '/inventory-count', show: true },
           { icon: AlertCircle, label: 'Loss Log', href: '/loss-log', show: true },
@@ -91,7 +93,12 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
     ...(isExecutive
       ? [
           { icon: BarChart3, label: 'Command Center', href: '/command-center', show: true },
+          { icon: ShoppingCart, label: 'POS Terminal', href: '/pos', show: true },
+          { icon: ListOrdered, label: 'Order Queue', href: '/order-queue', show: true },
+          { icon: ChefHat, label: 'Kitchen Display', href: '/kitchen-display', show: true },
           { icon: Percent, label: 'POS Management', href: '/pos-management', show: true },
+          { icon: Truck, label: 'Inventory Movements', href: '/inventory-movements', show: true },
+          { icon: Zap, label: 'Utility Log', href: '/utility-log', show: true },
           { icon: TrendingUp, label: 'Trend Analysis', href: '/trends', show: true },
           { icon: Sparkles, label: 'Malaya AI', href: '/malaya', show: true },
           { icon: Users, label: 'HR Management', href: '/hr/attendance', show: true },
@@ -100,10 +107,16 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
           { icon: MessageSquare, label: 'Newsfeed', href: '/newsfeed', show: true },
         ]
       : []),
-    ...(isExecutive ? [{ icon: Receipt, label: 'Purchase Orders', href: '/finance', show: true }] : []),
+    ...(isExecutive ? [{ icon: Receipt, label: isFinance ? 'PO Approvals' : 'Purchase Orders', href: '/finance', show: true }] : []),
     ...(isProcurement ? [{ icon: ClipboardList, label: 'Procurement', href: '/procurement', show: true }] : []),
     ...(isCanvasser ? [{ icon: Search, label: 'Canvass', href: '/canvass', show: true }] : []),
-    ...(isFinance ? [{ icon: Receipt, label: 'PO Approvals', href: '/finance', show: true }] : []),
+    ...(isFinance
+      ? [
+          { icon: Search, label: 'Procurement (view)', href: '/procurement', show: true },
+          { icon: Search, label: 'Canvass (view)', href: '/canvass', show: true },
+          { icon: Truck, label: 'Logistics', href: '/logistics', show: true },
+        ]
+      : []),
     ...(isLogistics
       ? [
           { icon: Truck, label: 'Logistics', href: '/logistics', show: true },

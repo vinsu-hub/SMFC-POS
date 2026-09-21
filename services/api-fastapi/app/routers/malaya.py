@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from groq import Groq
 
-from app.auth import CurrentUser, get_current_user
+from app.auth import CurrentUser, get_current_user, is_executive_like
 from app.deps import get_supabase
 from app.routers.hr import _compute_payroll_summary
 from app.routers.summary import _compute_branch_summary, _compute_organization_summary, _today_bounds
@@ -90,7 +90,7 @@ don't guess from the wrong one:
 
 def _branch_ids_for_context(supabase, user: CurrentUser) -> tuple[list[dict], bool, str]:
     """Returns (branches [{id, name}], is_org_wide, organization_id)."""
-    if user.role == "executive":
+    if is_executive_like(user):
         org_result = supabase.table("organizations").select("id").limit(1).execute()
         if not org_result.data:
             return [], True, ""

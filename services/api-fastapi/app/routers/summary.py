@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.auth import CurrentUser, get_current_user, require_branch_access
+from app.auth import CurrentUser, get_current_user, is_executive_like, require_branch_access
 from app.deps import get_supabase
 from app.schemas import BranchSummary, HourlyRevenuePoint, OrganizationSummary
 
@@ -170,7 +170,7 @@ def get_my_organization_summary(user: CurrentUser = Depends(get_current_user)):
     `organizations` is a single row today (see docs/backend-execution-plan.md
     §2 — "future-proofs multi-corp"), so this just takes that row.
     """
-    if user.role != "executive":
+    if not is_executive_like(user):
         raise HTTPException(status_code=403, detail="Only executives can view org-wide summaries")
 
     supabase = get_supabase()
@@ -187,7 +187,7 @@ def get_my_organization_summary(user: CurrentUser = Depends(get_current_user)):
 
 @router.get("/organizations/{organization_id}/summary", response_model=OrganizationSummary)
 def get_organization_summary(organization_id: str, user: CurrentUser = Depends(get_current_user)):
-    if user.role != "executive":
+    if not is_executive_like(user):
         raise HTTPException(status_code=403, detail="Only executives can view org-wide summaries")
 
     supabase = get_supabase()

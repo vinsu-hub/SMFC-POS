@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertTriangle, Package, Users, Info, Clock, DollarSign, TrendingUp } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { getCompanyKey } from '@/lib/types';
+import { getCompanyKey, isExecutiveLike } from '@/lib/types';
 
 interface NewsItem {
   id: string;
@@ -292,7 +292,7 @@ export default function Newsfeed() {
   const userBranchMetrics = user?.branch ? branchMetrics[getCompanyKey(user.branch)] : null;
 
   // Determine which branches to show
-  const visibleBranches = user?.role === 'executive'
+  const visibleBranches = isExecutiveLike(user?.role)
     ? ['danielito', 'malaya', 'dden']
     : user?.branch
     ? [getCompanyKey(user.branch)]
@@ -316,11 +316,11 @@ export default function Newsfeed() {
     <DashboardLayout title="Newsfeed">
       <div className="p-6 space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full gap-2 mb-6" style={{ gridTemplateColumns: `repeat(${user?.role === 'executive' ? 4 : user?.role === 'manager' ? 2 : 1}, 1fr)` }}>
+          <TabsList className="grid w-full gap-2 mb-6" style={{ gridTemplateColumns: `repeat(${isExecutiveLike(user?.role) ? 4 : user?.role === 'manager' ? 2 : 1}, 1fr)` }}>
             <TabsTrigger value="alerts" className="font-corp-body">
               Alerts & Updates
             </TabsTrigger>
-            {user?.role === 'executive' ? (
+            {isExecutiveLike(user?.role) ? (
               <>
                 <TabsTrigger value="danielito" className="font-corp-body">
                   Danielito's
@@ -720,7 +720,7 @@ export default function Newsfeed() {
           )}
 
           {/* Executive Branch Tabs */}
-          {user?.role === 'executive' && (
+          {isExecutiveLike(user?.role) && (
             <>
               {Object.entries(branchMetrics).map(([key, branch]) => (
                 <TabsContent key={key} value={key} className="space-y-6">

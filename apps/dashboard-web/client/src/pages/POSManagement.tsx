@@ -19,7 +19,7 @@ import {
   updateDiscountType,
   fetchBranches,
 } from '@/lib/api';
-import { BRANCH_CONFIG } from '@/lib/types';
+import { BRANCH_CONFIG, isExecutiveLike, isManagerPlus } from '@/lib/types';
 
 export default function POSManagement() {
   const { user } = useAuth();
@@ -34,7 +34,7 @@ export default function POSManagement() {
 
   // Managers act on their own branch; executives have no fixed branch, so
   // they pick one from the same real-location allow-list used elsewhere.
-  const isExecutive = user?.role === 'executive';
+  const isExecutive = isExecutiveLike(user?.role);
 
   useEffect(() => {
     if (!isExecutive) return;
@@ -60,7 +60,7 @@ export default function POSManagement() {
 
   useEffect(loadData, [activeBranchId]);
 
-  if (!user || (user.role !== 'manager' && user.role !== 'executive')) {
+  if (!user || !isManagerPlus(user?.role)) {
     return (
       <DashboardLayout>
         <div className="p-6 text-center">

@@ -55,9 +55,10 @@ export default function Canvass() {
   };
   useEffect(() => { void load(); }, []);
 
-  if (!user || user.role !== 'canvasser') {
-    return <DashboardLayout><p className="p-6 text-center text-red-600">Access denied. Canvass personnel only.</p></DashboardLayout>;
+  if (!user || !['canvasser', 'finance_admin'].includes(user.role)) {
+    return <DashboardLayout><p className="p-6 text-center text-red-600">Access denied.</p></DashboardLayout>;
   }
+  const canAct = user.role === 'canvasser'; // finance admin can view tickets, receiving and suppliers
 
   const setQ = (i: number, patch: Partial<QuoteRow>) => setQuotes(quotes.map((q, idx) => (idx === i ? { ...q, ...patch } : q)));
   const pickSupplier = (i: number, id: string) => {
@@ -143,7 +144,7 @@ export default function Canvass() {
                   </div>
                   <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:shrink-0">
                     <Badge className={`shrink-0 ${STATUS_STYLE[t.status]}`}>{statusLabel(t.status)}</Badge>
-                    {['open', 'submitted'].includes(t.status) && (
+                    {canAct && ['open', 'submitted'].includes(t.status) && (
                       <Button size="sm" className="min-h-9 " onClick={() => openTicket(t)}>
                         {t.status === 'open' ? 'Fill up canvass' : 'Add quotes'}
                       </Button>)}
@@ -164,7 +165,7 @@ export default function Canvass() {
                   </div>
                   <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:shrink-0">
                     <Badge className={`shrink-0 ${STATUS_STYLE[p.status]}`}>{statusLabel(p.status)}</Badge>
-                    {p.status === 'approved' && <Button size="sm" className="min-h-9 " onClick={() => startReceive(p)}>Receive</Button>}
+                    {canAct && p.status === 'approved' && <Button size="sm" className="min-h-9 " onClick={() => startReceive(p)}>Receive</Button>}
                   </div>
                 </CardContent>
               </Card>

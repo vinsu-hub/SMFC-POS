@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
-import { BRANCH_CONFIG } from '@/lib/types';
+import { BRANCH_CONFIG, isExecutiveLike } from '@/lib/types';
 import {
   ApiPayrollSummary,
   ApiPayrollRow,
@@ -48,7 +48,7 @@ export default function HRPayroll() {
 
   // Managers act on their own branch; executives have no fixed branch, so
   // they pick one from the same real-location allow-list used elsewhere.
-  const isExecutive = user?.role === 'executive';
+  const isExecutive = isExecutiveLike(user?.role);
   const [branches, setBranches] = useState<ApiBranch[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
 

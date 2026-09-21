@@ -1,66 +1,33 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
-  Plus,
-  Minus,
-  Trash2,
-  PhilippinePeso,
-  Loader2,
-  Search,
-  Users,
-  ShoppingBag,
-  Star,
-  Grid2x2,
-  List as ListIcon,
-  Pencil,
-  X,
-  Sparkles,
-  HelpCircle,
-  AlertTriangle,
-  Percent,
-  PauseCircle,
-  StickyNote,
+  Plus, Minus, Trash2, Loader2, Search, Users, ShoppingBag, Truck, Pencil, X, AlertTriangle, Percent, PauseCircle,
+  Play, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ApiBranch, ApiDiscountType, ApiKitchenSummary, fetchBranches, fetchDiscountTypes, fetchKitchenSummary } from '@/lib/api';
 import {
-  ApiProduct,
-  ApiDiscountType,
-  ApiKitchenSummary,
-  closeTransaction,
-  createTransaction,
-  fetchDiscountTypes,
-  fetchKitchenSummary,
-  fetchProducts,
-} from '@/lib/api';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+  BusinessDay, Availability, PosDeliveryFee, PosOrderType, PosPayment, PosProduct,
+  createPosSale, fetchDeliveryFees, fetchPosMenu, fetchRequireBusinessDay, fetchTodayBusinessDay, openBusinessDay,
+} from '@/lib/posApi';
 import { formatCurrency } from '@/lib/utils';
-import { getCompanyKey, type CompanyKey } from '@/lib/types';
+import { getBranchConfig, isExecutiveLike, type CompanyKey } from '@/lib/types';
 
-interface OrderItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-  note: string;
-}
+interface CartLine { id: string; name: string; price: number; quantity: number; note: string }
+interface HeldCart { id: string; heldAt: string; lines: CartLine[]; orderType: PosOrderType; table: string }
 
-interface HeldOrder {
-  id: string;
-  heldAt: string;
-  items: OrderItem[];
-}
+type AvailabilityFilter = 'all' | Availability;
+type VatMode = 'vat' | 'non_vat';
 
-type AvailabilityFilter = 'all' | 'available' | 'low_stock' | 'unavailable';
-type SortMode = 'popularity' | 'price' | 'name' | 'stock';
-type ViewMode = 'grid' | 'list';
-type OrderTypeValue = 'dine_in' | 'take_out';
-type PaymentMethod = 'cash' | 'gcash' | 'card' | 'split';
+const PAGE_SIZE = 12;
+const HELD_KEY = 'pos-held-carts';
+const VAT_RATE = 0.12;
 
 interface BranchPosTheme {
   pageBg: string;
@@ -180,756 +147,526 @@ const POS_THEMES: Record<CompanyKey, BranchPosTheme> = {
   },
 };
 
-const FAVORITES_STORAGE_KEY = 'pos-favorite-products';
+function loadHeld(): HeldCart[] {
+  try { return JSON.parse(localStorage.getItem(HELD_KEY) || '[]') as HeldCart[]; } catch { return []; }
+}
 
 export default function POSTerminal() {
   const { user } = useAuth();
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  const [products, setProducts] = useState<ApiProduct[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityFilter>('all');
-  const [sortMode, setSortMode] = useState<SortMode>('popularity');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [checkingOut, setCheckingOut] = useState(false);
+  const companyWide = isExecutiveLike(user?.role);
+  const canUse = !!user && (user.role === 'employee' || user.role === 'manager' || companyWide);
+
+  const [branches, setBranches] = useState<ApiBranch[]>([]);
+  const [pickedBranch, setPickedBranch] = useState<string>('');
+  const branchId = companyWide ? pickedBranch : user?.branchId ?? '';
+  const branchThemeKey = companyWide ? branches.find((b) => b.id === pickedBranch)?.theme_key : user?.branch;
+  const theme = POS_THEMES[getBranchConfig(branchThemeKey).companyKey as CompanyKey];
+
+  const [products, setProducts] = useState<PosProduct[]>([]);
+  const [loadingMenu, setLoadingMenu] = useState(false);
+  const [category, setCategory] = useState('All');
+  const [availability, setAvailability] = useState<AvailabilityFilter>('all');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+
   const [discountTypes, setDiscountTypes] = useState<ApiDiscountType[]>([]);
-  const [selectedDiscountId, setSelectedDiscountId] = useState<string | null>(null);
-  const [kitchenSummary, setKitchenSummary] = useState<ApiKitchenSummary | null>(null);
+  const [discountId, setDiscountId] = useState<string | null>(null);
+  const [kitchen, setKitchen] = useState<ApiKitchenSummary | null>(null);
 
-  const [orderType, setOrderType] = useState<OrderTypeValue>('dine_in');
-  const [tableNumber, setTableNumber] = useState('');
-  const [guestCount, setGuestCount] = useState(2);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [cart, setCart] = useState<CartLine[]>([]);
+  const [orderType, setOrderType] = useState<PosOrderType>('dine_in');
+  const [table, setTable] = useState('');
+  const [guests, setGuests] = useState(2);
+  const [vatMode, setVatMode] = useState<VatMode>('vat');
+  const [payment, setPayment] = useState<PosPayment | null>(null);
+  const [cardType, setCardType] = useState<'debit' | 'credit'>('debit');
+  const [charging, setCharging] = useState(false);
+  const [held, setHeld] = useState<HeldCart[]>(loadHeld);
 
-  const [favorites, setFavorites] = useState<Set<string>>(() => {
-    try {
-      const raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
-      return raw ? new Set(JSON.parse(raw)) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
-  const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [fees, setFees] = useState<PosDeliveryFee[]>([]);
+  const [dName, setDName] = useState('');
+  const [dPhone, setDPhone] = useState('');
+  const [dAddress, setDAddress] = useState('');
+  const [dLandmark, setDLandmark] = useState('');
+  const [dBarangay, setDBarangay] = useState('');
+
+  const [noteId, setNoteId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState('');
+  const [editOpen, setEditOpen] = useState(false);
 
-  const [ownerRequestOpen, setOwnerRequestOpen] = useState(false);
-  const [ownerRequestForm, setOwnerRequestForm] = useState({ employeeNumber: '', pin: '', note: '' });
-  const [ownerRequestConfirmed, setOwnerRequestConfirmed] = useState<{
-    employeeNumber: string;
-    pin: string;
-    note: string;
-  } | null>(null);
+  const [ownerOpen, setOwnerOpen] = useState(false);
+  const [ownerForm, setOwnerForm] = useState({ employeeNumber: '', pin: '', note: '' });
+  const [owner, setOwner] = useState<typeof ownerForm | null>(null);
+
+  const [requireDay, setRequireDay] = useState(false);
+  const [day, setDay] = useState<BusinessDay | null>(null);
+  const [dayOpen, setDayOpen] = useState(false);
+  const [dayForm, setDayForm] = useState({ employeeNumber: '', pin: '' });
+  const [dayBusy, setDayBusy] = useState(false);
 
   useEffect(() => {
-    if (!user?.branchId) return;
-    setLoadingProducts(true);
-    fetchProducts(user.branchId)
+    if (!companyWide) return;
+    fetchBranches().then((b) => { setBranches(b); setPickedBranch((cur) => cur || b[0]?.id || ''); }).catch(() => toast.error('Could not load branches'));
+  }, [companyWide]);
+
+  useEffect(() => {
+    if (!canUse) return;
+    fetchDeliveryFees().then(setFees).catch(() => { /* delivery stays selectable without fee readout */ });
+    fetchRequireBusinessDay().then(setRequireDay).catch(() => {});
+  }, [canUse]);
+
+  const refreshDay = useCallback(() => {
+    if (companyWide) return;
+    fetchTodayBusinessDay().then(setDay).catch(() => setDay(null));
+  }, [companyWide]);
+  useEffect(() => { if (canUse) refreshDay(); }, [canUse, refreshDay]);
+
+  const loadMenu = useCallback(() => {
+    if (!branchId) return;
+    setLoadingMenu(true);
+    fetchPosMenu(branchId)
       .then(setProducts)
-      .catch(() => toast.error('Could not load the menu. Check your connection.'))
-      .finally(() => setLoadingProducts(false));
-    fetchDiscountTypes(user.branchId, true)
-      .then(setDiscountTypes)
-      .catch(() => {
-        /* discounts are optional — POS still works without them */
-      });
-    fetchKitchenSummary(user.branchId).then(setKitchenSummary).catch(() => {});
-  }, [user?.branchId]);
-
-  // Quick-action keyboard shortcuts: F3 discount, F4 hold, F5 note, Esc clear.
+      .catch((e: Error) => toast.error(e.message || 'Could not load the menu.'))
+      .finally(() => setLoadingMenu(false));
+    fetchDiscountTypes(branchId, true).then(setDiscountTypes).catch(() => setDiscountTypes([]));
+    fetchKitchenSummary(branchId).then(setKitchen).catch(() => setKitchen(null));
+  }, [branchId]);
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'F3') {
-        e.preventDefault();
-        document.getElementById('discount-chip-row')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } else if (e.key === 'F4') {
-        e.preventDefault();
-        handleHoldOrder();
-      } else if (e.key === 'F5') {
-        e.preventDefault();
-        if (orderItems.length > 0) startEditingNote(orderItems[orderItems.length - 1].id);
-      } else if (e.key === 'Escape') {
-        if (orderItems.length > 0) handleClearOrder();
-      }
+    setCart([]); setDiscountId(null); setCategory('All'); setPage(0);
+    loadMenu();
+  }, [loadMenu]);
+
+  useEffect(() => { try { localStorage.setItem(HELD_KEY, JSON.stringify(held)); } catch { /* ignore */ } }, [held]);
+
+  const categories = useMemo(() => ['All', ...Array.from(new Set(products.map((p) => p.category))).sort()], [products]);
+  const counts = useMemo(() => ({
+    all: products.length,
+    available: products.filter((p) => p.availability === 'available').length,
+    low_stock: products.filter((p) => p.availability === 'low_stock').length,
+    unavailable: products.filter((p) => p.availability === 'unavailable').length,
+  }), [products]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return products.filter((p) =>
+      (category === 'All' || p.category === category) &&
+      (availability === 'all' || p.availability === availability) &&
+      (!q || p.name.toLowerCase().includes(q)));
+  }, [products, category, availability, search]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const visible = filtered.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+  useEffect(() => { setPage(0); }, [category, availability, search]);
+
+  const discount = discountTypes.find((d) => d.id === discountId) ?? null;
+  const subtotal = cart.reduce((n, l) => n + l.price * l.quantity, 0);
+  const discountAmount = discount ? Math.round(subtotal * discount.percentage) / 100 : 0;
+  const net = subtotal - discountAmount;
+  const vatExempt = vatMode === 'non_vat' || !!discount?.vat_exempt;
+  const tax = vatExempt ? 0 : Math.round(net * VAT_RATE * 100) / 100;
+  const deliveryFee = orderType === 'delivery' ? fees.find((f) => f.barangay === dBarangay)?.fee ?? 0 : 0;
+  const total = net + tax + deliveryFee;
+
+  const dayLocked = requireDay && !companyWide && !!day && !day.is_open;
+
+  const addItem = (p: PosProduct) => {
+    if (p.availability === 'unavailable') return;
+    setCart((c) => c.some((l) => l.id === p.id)
+      ? c.map((l) => (l.id === p.id ? { ...l, quantity: l.quantity + 1 } : l))
+      : [...c, { id: p.id, name: p.name, price: p.price, quantity: 1, note: '' }]);
+  };
+  const changeQty = (id: string, d: number) => setCart((c) => c.map((l) => (l.id === id ? { ...l, quantity: l.quantity + d } : l)).filter((l) => l.quantity > 0));
+  const removeLine = (id: string) => setCart((c) => c.filter((l) => l.id !== id));
+
+  const clearOrder = useCallback(() => {
+    setCart([]); setDiscountId(null); setOwner(null); setTable(''); setPayment(null); setVatMode('vat');
+    setDName(''); setDPhone(''); setDAddress(''); setDLandmark(''); setDBarangay('');
+  }, []);
+
+  const holdOrder = useCallback(() => {
+    if (cart.length === 0) return void toast.error('Nothing to hold — the order is empty');
+    setHeld((h) => [...h, { id: crypto.randomUUID(), heldAt: new Date().toISOString(), lines: cart, orderType, table }]);
+    clearOrder();
+    toast.success('Order held');
+  }, [cart, orderType, table, clearOrder]);
+
+  const resumeHeld = (h: HeldCart) => {
+    setCart(h.lines); setOrderType(h.orderType); setTable(h.table);
+    setHeld((all) => all.filter((x) => x.id !== h.id));
+  };
+
+  // F3 discount, F4 hold, Esc clear (ignored while typing in a field or a dialog is open)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'F3') { e.preventDefault(); document.getElementById('discount-chip-row')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+      else if (e.key === 'F4') { e.preventDefault(); holdOrder(); }
+      else if (e.key === 'Escape' && !document.querySelector('[role="dialog"]') && cart.length > 0) clearOrder();
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderItems]);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [holdOrder, clearOrder, cart.length]);
 
-  // All useMemo calls must run on every render regardless of the
-  // employee-only early return below -- Rules of Hooks requires the same
-  // hooks in the same order every render, so these stay above that guard.
-  const categories = useMemo(() => Array.from(new Set(products.map((p) => p.category))).sort(), [products]);
-
-  const availabilityCounts = useMemo(
-    () => ({
-      all: products.length,
-      available: products.filter((p) => p.availability === 'available').length,
-      low_stock: products.filter((p) => p.availability === 'low_stock').length,
-      unavailable: products.filter((p) => p.availability === 'unavailable').length,
-    }),
-    [products]
-  );
-
-  const visibleProducts = useMemo(() => {
-    let list = products;
-    if (selectedCategory === 'Favorites') list = list.filter((p) => favorites.has(p.id));
-    else if (selectedCategory !== 'All' && selectedCategory !== 'Popular') {
-      list = list.filter((p) => p.category === selectedCategory);
-    }
-    if (availabilityFilter !== 'all') list = list.filter((p) => p.availability === availabilityFilter);
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      list = list.filter((p) => p.name.toLowerCase().includes(q));
-    }
-    const sorted = [...list];
-    if (sortMode === 'price') sorted.sort((a, b) => a.price - b.price);
-    else if (sortMode === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name));
-    // 'stock' and 'popularity' fall back to the server's natural order —
-    // no per-product stock or sales-frequency ranking exists yet to sort
-    // by; a real "Popularity" driver is a reasonable v2 addition once
-    // order-frequency data is aggregated somewhere.
-    return sorted;
-  }, [products, selectedCategory, availabilityFilter, searchQuery, sortMode, favorites]);
-
-  const upsellItems = useMemo(() => {
-    const inCartIds = new Set(orderItems.map((i) => i.id));
-    return products
-      .filter((p) => !inCartIds.has(p.id) && p.availability !== 'unavailable' && (p.category === 'Sides' || p.category === 'Drinks' || p.category === 'Desserts'))
-      .slice(0, 6);
-  }, [products, orderItems]);
-
-  if (!user || user.role !== 'employee' || !user.branch) {
+  if (!canUse) {
     return (
-      <DashboardLayout>
-        <div className="p-6 text-center">
-          <p className="text-destructive">Access denied. This page is for employees only.</p>
-        </div>
+      <DashboardLayout title="POS Terminal">
+        <p className="p-6 text-center text-destructive">Access denied. The POS is for branch staff and executive/finance accounts.</p>
       </DashboardLayout>
     );
   }
 
-  const theme = POS_THEMES[getCompanyKey(user.branch)];
+  const blockers: string[] = [];
+  if (!branchId) blockers.push('Pick a branch');
+  if (dayLocked) blockers.push('Start the business day');
+  if (cart.length === 0) blockers.push('Add items');
+  if (orderType === 'dine_in' && !table.trim()) blockers.push('Enter a table number');
+  if (orderType === 'delivery') {
+    if (!dName.trim() || !dPhone.trim() || !dAddress.trim()) blockers.push('Enter delivery customer details');
+    if (!dBarangay) blockers.push('Pick a barangay');
+  }
+  if (!payment) blockers.push('Choose a payment method');
 
-  const toggleFavorite = (productId: string) => {
-    setFavorites((prev) => {
-      const next = new Set(prev);
-      if (next.has(productId)) next.delete(productId);
-      else next.add(productId);
-      localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(Array.from(next)));
-      return next;
-    });
-  };
-
-  const addItem = (product: ApiProduct) => {
-    if (product.availability === 'unavailable') return;
-    const existing = orderItems.find((o) => o.id === product.id);
-    if (existing) {
-      setOrderItems(orderItems.map((o) => (o.id === product.id ? { ...o, quantity: o.quantity + 1 } : o)));
-    } else {
-      setOrderItems([...orderItems, { id: product.id, name: product.name, price: product.price, quantity: 1, note: '' }]);
-    }
-  };
-
-  const removeItem = (id: string) => setOrderItems(orderItems.filter((o) => o.id !== id));
-
-  const updateQuantity = (id: string, delta: number) => {
-    setOrderItems(
-      orderItems.map((o) => (o.id === id ? { ...o, quantity: Math.max(1, o.quantity + delta) } : o)).filter((o) => o.quantity > 0)
-    );
-  };
-
-  const startEditingNote = (id: string) => {
-    setEditingNoteId(id);
-    setNoteDraft(orderItems.find((o) => o.id === id)?.note ?? '');
-  };
-
-  const saveNote = () => {
-    if (!editingNoteId) return;
-    setOrderItems(orderItems.map((o) => (o.id === editingNoteId ? { ...o, note: noteDraft.trim() } : o)));
-    setEditingNoteId(null);
-    setNoteDraft('');
-  };
-
-  const handleHoldOrder = () => {
-    if (orderItems.length === 0) {
-      toast.error('Nothing to hold — cart is empty');
-      return;
-    }
-    setHeldOrders((prev) => [...prev, { id: crypto.randomUUID(), heldAt: new Date().toISOString(), items: orderItems }]);
-    setOrderItems([]);
-    toast.success('Order held — resume it anytime before this shift ends');
-  };
-
-  const resumeHeldOrder = (held: HeldOrder) => {
-    setOrderItems(held.items);
-    setHeldOrders((prev) => prev.filter((h) => h.id !== held.id));
-  };
-
-  const handleClearOrder = () => {
-    setOrderItems([]);
-    setSelectedDiscountId(null);
-    setOwnerRequestConfirmed(null);
-  };
-
-  const selectedDiscount = discountTypes.find((d) => d.id === selectedDiscountId) ?? null;
-  const subtotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const discountAmount = selectedDiscount ? subtotal * (selectedDiscount.percentage / 100) : 0;
-  const discountedSubtotal = subtotal - discountAmount;
-  // Client-side preview only — the backend recomputes this authoritatively
-  // from discount_type_id, never trusts a client-sent amount.
-  const tax = selectedDiscount?.vat_exempt ? 0 : discountedSubtotal * 0.12;
-  const total = discountedSubtotal + tax;
-
-  const toggleDiscount = (id: string) => setSelectedDiscountId((current) => (current === id ? null : id));
-
-  const handleOpenOwnerRequest = () => {
-    setOwnerRequestForm({ employeeNumber: '', pin: '', note: '' });
-    setOwnerRequestOpen(true);
-  };
-
-  const handleConfirmOwnerRequest = () => {
-    if (!ownerRequestForm.employeeNumber || !ownerRequestForm.pin) {
-      toast.error('Enter your employee number and PIN');
-      return;
-    }
-    setOwnerRequestConfirmed({ ...ownerRequestForm });
-    setOwnerRequestOpen(false);
-    toast.success("Order will be logged as an Owner's Request under your ID");
-  };
-
-  const handleCheckout = async () => {
-    if (orderItems.length === 0) {
-      toast.error('Add items to order');
-      return;
-    }
-    if (!user.branchId) {
-      toast.error('No branch assigned to this account');
-      return;
-    }
-    if (orderType === 'dine_in' && !tableNumber.trim()) {
-      toast.error('Enter a table number for a dine-in order');
-      return;
-    }
-
-    setCheckingOut(true);
+  const charge = async () => {
+    if (blockers.length > 0 || !payment) return void toast.error(blockers[0]);
+    setCharging(true);
     try {
-      const transaction = await createTransaction(
-        user.branchId,
-        user.id,
-        orderItems.map((item) => ({ product_id: item.id, quantity: item.quantity, note: item.note || undefined })),
-        {
-          discount_type_id: selectedDiscountId,
-          is_owner_request: !!ownerRequestConfirmed,
-          owner_request_employee_number: ownerRequestConfirmed?.employeeNumber,
-          owner_request_pin: ownerRequestConfirmed?.pin,
-          owner_request_note: ownerRequestConfirmed?.note || undefined,
-          order_type: orderType,
-          table_number: orderType === 'dine_in' ? tableNumber.trim() : null,
-          guest_count: orderType === 'dine_in' ? guestCount : null,
-        }
-      );
-      await closeTransaction(transaction.id);
-      toast.success(`Order placed: ${formatCurrency(transaction.total_amount)}`);
-      setOrderItems([]);
-      setSelectedDiscountId(null);
-      setOwnerRequestConfirmed(null);
-      setTableNumber('');
-      fetchKitchenSummary(user.branchId!).then(setKitchenSummary).catch(() => {});
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Order failed to save. Try again.');
-      console.error(error);
+      const sale = await createPosSale({
+        branch_id: companyWide ? branchId : undefined,
+        order_type: orderType,
+        items: cart.map((l) => ({ product_id: l.id, quantity: l.quantity, note: l.note || undefined })),
+        discount_type_id: discountId,
+        force_vat_exempt: vatMode === 'non_vat',
+        table_number: orderType === 'dine_in' ? table.trim() : null,
+        guest_count: orderType === 'dine_in' ? guests : null,
+        payment_method: payment,
+        card_type: cardType,
+        is_owner_request: !!owner,
+        owner_request_employee_number: owner?.employeeNumber,
+        owner_request_pin: owner?.pin,
+        owner_request_note: owner?.note || undefined,
+        delivery: orderType === 'delivery'
+          ? { customer_name: dName.trim(), customer_phone: dPhone.trim(), address: dAddress.trim(), landmark: dLandmark.trim() || null, barangay: dBarangay }
+          : null,
+      });
+      toast.success(`Order ${sale.order_number ?? ''} charged: ${formatCurrency(sale.total_amount + sale.tax_amount + sale.delivery_fee)}`);
+      clearOrder();
+      loadMenu();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Order failed to save. Try again.');
     } finally {
-      setCheckingOut(false);
+      setCharging(false);
     }
   };
 
-  const pillCategories = ['Favorites', 'Popular', ...categories, 'All'];
+  const submitDay = async () => {
+    if (!dayForm.employeeNumber || !dayForm.pin) return void toast.error('Enter your employee number and PIN');
+    setDayBusy(true);
+    try {
+      setDay(await openBusinessDay(dayForm.employeeNumber, dayForm.pin));
+      setDayOpen(false);
+      setDayForm({ employeeNumber: '', pin: '' });
+      toast.success('Business day started');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not start the business day');
+    } finally {
+      setDayBusy(false);
+    }
+  };
+
+  const orderTypes: { v: PosOrderType; label: string; Icon: typeof Users }[] = [
+    { v: 'dine_in', label: 'Dine In', Icon: Users },
+    { v: 'takeout', label: 'Takeout', Icon: ShoppingBag },
+    { v: 'delivery', label: 'Delivery', Icon: Truck },
+  ];
+  const chip = 'shrink-0 px-3 py-1.5 rounded-full text-sm border transition-colors';
 
   return (
     <DashboardLayout title="POS Terminal">
-      <div className={`flex flex-col md:flex-row h-full ${theme.pageBg}`}>
-        {/* Main content */}
-        <div className="flex-1 p-4 md:p-6 overflow-auto space-y-4">
-          {/* Search + Order Type */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search menu item or SKU..."
-                className={`pl-9 ${theme.bodyFont}`}
-              />
-            </div>
-            <div className="flex rounded-md overflow-hidden border border-border-regular shrink-0">
-              <button
-                type="button"
-                onClick={() => setOrderType('dine_in')}
-                className={`flex items-center gap-1.5 px-4 py-2 text-sm ${theme.bodyFont} ${
-                  orderType === 'dine_in' ? theme.primaryBtn : 'bg-card text-foreground'
-                }`}
-              >
-                <Users className="w-4 h-4" /> Dine In
-              </button>
-              <button
-                type="button"
-                onClick={() => setOrderType('take_out')}
-                className={`flex items-center gap-1.5 px-4 py-2 text-sm ${theme.bodyFont} ${
-                  orderType === 'take_out' ? theme.primaryBtn : 'bg-card text-foreground'
-                }`}
-              >
-                <ShoppingBag className="w-4 h-4" /> Takeout
-              </button>
-            </div>
-          </div>
-
-          {/* Category pills */}
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {pillCategories.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setSelectedCategory(cat)}
-                className={`shrink-0 px-4 py-1.5 rounded-full text-sm ${theme.bodyFont} transition-colors ${
-                  selectedCategory === cat ? theme.pillActive : `${theme.pillBg} ${theme.cardHeading}`
-                }`}
-              >
-                {cat === 'Favorites' && <Star className="inline w-3.5 h-3.5 mr-1 -mt-0.5" />}
-                {cat}
-              </button>
-            ))}
-          </div>
-
-          {/* Availability tabs + sort/view */}
+      <div className={`flex flex-col lg:flex-row h-full ${theme.pageBg}`}>
+        {/* Menu side */}
+        <div className="flex-1 min-w-0 p-3 sm:p-4 lg:p-6 overflow-auto space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            {(['all', 'available', 'low_stock', 'unavailable'] as AvailabilityFilter[]).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setAvailabilityFilter(f)}
-                className={`px-3 py-1 rounded-full text-xs font-corp-body border ${
-                  availabilityFilter === f
-                    ? 'bg-primary text-primary-foreground border-transparent'
-                    : 'bg-card text-muted-foreground border-border-regular'
-                }`}
-              >
-                {f === 'all' ? 'All' : f === 'available' ? 'Available' : f === 'low_stock' ? 'Low Stock' : 'Unavailable'} (
-                {availabilityCounts[f]})
-              </button>
-            ))}
-            <div className="ml-auto flex items-center gap-2">
-              <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-                <SelectTrigger className="w-40 h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="popularity">Sort: Popularity</SelectItem>
-                  <SelectItem value="price">Sort: Price</SelectItem>
-                  <SelectItem value="name">Sort: Name</SelectItem>
-                  <SelectItem value="stock">Sort: Stock</SelectItem>
-                </SelectContent>
+            {companyWide && (
+              <Select value={pickedBranch} onValueChange={setPickedBranch}>
+                <SelectTrigger className="w-56 h-9" aria-label="Branch"><SelectValue placeholder="Select branch" /></SelectTrigger>
+                <SelectContent className="max-h-72">{branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
               </Select>
-              <Button size="icon-sm" variant={viewMode === 'grid' ? 'default' : 'outline'} onClick={() => setViewMode('grid')}>
-                <Grid2x2 className="w-4 h-4" />
-              </Button>
-              <Button size="icon-sm" variant={viewMode === 'list' ? 'default' : 'outline'} onClick={() => setViewMode('list')}>
-                <ListIcon className="w-4 h-4" />
-              </Button>
+            )}
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search menu items" className={`pl-9 ${theme.bodyFont}`} />
             </div>
+            {!companyWide && requireDay && day && !day.is_open && (
+              <Button data-pos-business-day size="sm" className="gap-2" onClick={() => setDayOpen(true)}>
+                <Play className="w-4 h-4" /> Start Business Day
+              </Button>
+            )}
           </div>
 
-          {/* Product grid */}
-          {loadingProducts ? (
-            <div className={`flex items-center justify-center py-16 ${theme.loadingText}`}>
-              <Loader2 className="w-6 h-6 mr-2 animate-spin" />
-              Loading menu...
-            </div>
-          ) : visibleProducts.length === 0 ? (
-            <p className={`text-center py-16 ${theme.emptyText}`}>No items match this view.</p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {categories.map((c) => (
+              <button key={c} type="button" onClick={() => setCategory(c)}
+                className={`${chip} ${theme.bodyFont} ${category === c ? theme.pillActive : `${theme.pillBg} ${theme.cardHeading}`}`}>{c}</button>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {([['all', 'All'], ['available', 'Available'], ['low_stock', 'Low Stock'], ['unavailable', 'Unavailable']] as const).map(([f, label]) => (
+              <button key={f} type="button" onClick={() => setAvailability(f)}
+                className={`px-3 py-1 rounded-full text-xs border ${availability === f ? 'bg-primary text-primary-foreground border-transparent' : 'bg-card text-muted-foreground border-border-regular'}`}>
+                {label} ({counts[f]})
+              </button>
+            ))}
+          </div>
+
+          {loadingMenu ? (
+            <div className={`flex items-center justify-center py-16 ${theme.loadingText}`}><Loader2 className="w-6 h-6 mr-2 animate-spin" />Loading menu...</div>
+          ) : visible.length === 0 ? (
+            <p className={`text-center py-16 ${theme.emptyText}`}>{branchId ? 'No items match this view.' : 'Select a branch to load its menu.'}</p>
           ) : (
-            <div className={viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4' : 'space-y-2'}>
-              {visibleProducts.map((product) => {
-                const unavailable = product.availability === 'unavailable';
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3" data-testid="pos-menu">
+              {visible.map((p) => {
+                const out = p.availability === 'unavailable';
                 return (
-                  <Card
-                    key={product.id}
-                    className={`${theme.cardBg} ${theme.cardBorder} overflow-hidden relative ${unavailable ? 'opacity-70' : ''} ${
-                      viewMode === 'list' ? 'flex flex-row items-center' : ''
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => toggleFavorite(product.id)}
-                      className="absolute top-2 right-2 z-10 bg-white/90 rounded-full p-1 shadow-sm"
-                      aria-label="Toggle favorite"
-                    >
-                      <Star className={`w-4 h-4 ${favorites.has(product.id) ? 'fill-yellow-400 text-yellow-500' : 'text-muted-foreground'}`} />
-                    </button>
-                    {product.availability === 'low_stock' && (
-                      <span
-                        className="absolute top-2 left-2 z-10 text-[10px] font-bold uppercase px-2 py-0.5 rounded text-white"
-                        style={{ backgroundColor: theme.accentOrange }}
-                      >
-                        Low Stock
-                      </span>
-                    )}
-                    {unavailable && (
-                      <span
-                        className="absolute top-2 left-2 z-10 text-[10px] font-bold uppercase px-2 py-0.5 rounded text-white"
-                        style={{ backgroundColor: theme.accentRed }}
-                      >
-                        Unavailable
-                      </span>
-                    )}
-                    <div className={viewMode === 'grid' ? 'aspect-square w-full bg-muted' : 'w-20 h-20 shrink-0 bg-muted'}>
-                      {product.image_url ? (
-                        <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">No photo</div>
-                      )}
+                  <button key={p.id} type="button" disabled={out} onClick={() => addItem(p)} data-testid="pos-item"
+                    className={`text-left rounded-lg p-3 min-h-[92px] flex flex-col justify-between ${theme.cardBg} ${theme.cardBorder} ${out ? 'opacity-60 cursor-not-allowed' : 'hover:shadow-md active:scale-[0.98] transition'}`}>
+                    <p className={`text-sm font-semibold leading-snug ${theme.cardHeading} ${theme.displayFont}`}>{p.name}</p>
+                    <div className="flex items-center justify-between gap-1 mt-2">
+                      <span className="text-sm font-corp-mono">{formatCurrency(p.price)}</span>
+                      {p.availability === 'low_stock' && <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-white" style={{ backgroundColor: theme.accentOrange }}>Low</span>}
+                      {out && <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded text-white" style={{ backgroundColor: theme.accentRed }}>Out</span>}
                     </div>
-                    <CardContent className={viewMode === 'grid' ? 'p-3 space-y-1' : 'p-3 flex-1 flex items-center justify-between'}>
-                      <div>
-                        <p className={`text-sm font-semibold ${theme.cardHeading} ${theme.displayFont}`}>{product.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {product.needs_pricing ? 'Needs pricing' : formatCurrency(product.price)}
-                        </p>
-                      </div>
-                      <Button
-                        size="sm"
-                        disabled={unavailable}
-                        onClick={() => addItem(product)}
-                        className={viewMode === 'grid' ? 'w-full mt-1' : ''}
-                      >
-                        <Plus className="w-3.5 h-3.5 mr-1" /> Add
-                      </Button>
-                    </CardContent>
-                  </Card>
+                  </button>
                 );
               })}
             </div>
           )}
 
-          {/* Upsell rail */}
-          {upsellItems.length > 0 && (
-            <div>
-              <p className={`text-sm font-semibold mb-2 ${theme.cardHeading} ${theme.displayFont}`}>You might also like</p>
-              <div className="flex gap-3 overflow-x-auto pb-1">
-                {upsellItems.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => addItem(p)}
-                    className={`shrink-0 w-32 rounded-lg p-2 text-left ${theme.cardBg} ${theme.cardBorder}`}
-                  >
-                    <p className={`text-xs font-medium truncate ${theme.cardHeading}`}>{p.name}</p>
-                    <p className="text-xs text-muted-foreground">{formatCurrency(p.price)}</p>
-                  </button>
-                ))}
-              </div>
+          {pageCount > 1 && (
+            <div className="flex items-center justify-center gap-3 text-sm">
+              <Button size="icon-sm" variant="outline" disabled={safePage === 0} onClick={() => setPage(safePage - 1)} aria-label="Previous page"><ChevronLeft className="w-4 h-4" /></Button>
+              <span>Page {safePage + 1} of {pageCount}</span>
+              <Button size="icon-sm" variant="outline" disabled={safePage >= pageCount - 1} onClick={() => setPage(safePage + 1)} aria-label="Next page"><ChevronRight className="w-4 h-4" /></Button>
             </div>
           )}
+        </div>
 
-          {/* Quick actions */}
-          <div className="flex flex-wrap gap-2 pt-2 border-t border-border-regular">
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => document.getElementById('discount-chip-row')?.scrollIntoView({ behavior: 'smooth' })}>
-              <Percent className="w-3.5 h-3.5" /> Discount <kbd className="text-[10px] text-muted-foreground ml-1">F3</kbd>
-            </Button>
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={handleHoldOrder}>
-              <PauseCircle className="w-3.5 h-3.5" /> Hold Order <kbd className="text-[10px] text-muted-foreground ml-1">F4</kbd>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => orderItems.length > 0 && startEditingNote(orderItems[orderItems.length - 1].id)}
-              disabled={orderItems.length === 0}
-            >
-              <StickyNote className="w-3.5 h-3.5" /> Notes <kbd className="text-[10px] text-muted-foreground ml-1">F5</kbd>
-            </Button>
-            <Button variant="outline" size="sm" className="gap-1.5 text-destructive" onClick={handleClearOrder} disabled={orderItems.length === 0}>
-              <X className="w-3.5 h-3.5" /> Clear <kbd className="text-[10px] text-muted-foreground ml-1">Esc</kbd>
-            </Button>
-            {heldOrders.length > 0 && (
+        {/* Current order */}
+        <div className={`w-full lg:w-[400px] shrink-0 ${theme.ticketBg} ${theme.ticketBorder} p-4 flex flex-col shadow-lg lg:overflow-y-auto`}>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className={`text-xl ${theme.ticketHeading}`}>Current Order</h2>
+            <div className="flex items-center gap-1.5">
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-1.5 ml-auto">
-                    <PauseCircle className="w-3.5 h-3.5" /> {heldOrders.length} Held Order{heldOrders.length === 1 ? '' : 's'}
-                  </Button>
+                  <Button variant="outline" size="sm" className="gap-1.5"><PauseCircle className="w-3.5 h-3.5" />Held ({held.length})</Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-64 space-y-2">
-                  {heldOrders.map((h) => (
-                    <button
-                      key={h.id}
-                      onClick={() => resumeHeldOrder(h)}
-                      className="w-full text-left text-sm p-2 rounded hover:bg-accent"
-                    >
-                      {h.items.length} item{h.items.length === 1 ? '' : 's'} — held {new Date(h.heldAt).toLocaleTimeString()}
+                <PopoverContent className="w-64 space-y-1">
+                  {held.length === 0 && <p className="text-sm text-muted-foreground">No held orders.</p>}
+                  {held.map((h) => (
+                    <button key={h.id} onClick={() => resumeHeld(h)} className="w-full text-left text-sm p-2 rounded hover:bg-accent">
+                      {h.lines.length} item{h.lines.length === 1 ? '' : 's'}{h.table ? ` · Table ${h.table}` : ''} · {new Date(h.heldAt).toLocaleTimeString()}
                     </button>
                   ))}
                 </PopoverContent>
               </Popover>
-            )}
-          </div>
-        </div>
-
-        {/* Order Panel */}
-        <div className={`w-full md:w-96 shrink-0 max-h-[70vh] md:max-h-none ${theme.ticketBg} ${theme.ticketBorder} p-4 md:p-6 flex flex-col overflow-hidden shadow-lg`}>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className={`text-xl ${theme.ticketHeading}`}>Current Order</h2>
-            {orderType === 'dine_in' && (
-              <Input
-                value={tableNumber}
-                onChange={(e) => setTableNumber(e.target.value)}
-                placeholder="Table #"
-                className="w-24 h-8 text-sm text-right"
-              />
-            )}
-          </div>
-          {orderType === 'dine_in' ? (
-            <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
-              <Users className="w-3.5 h-3.5" /> Dine In
-              <div className="flex items-center gap-1 ml-auto">
-                <Button size="icon-sm" variant="outline" onClick={() => setGuestCount((g) => Math.max(1, g - 1))}>
-                  <Minus className="w-3 h-3" />
-                </Button>
-                <span className="w-6 text-center">{guestCount}</span>
-                <Button size="icon-sm" variant="outline" onClick={() => setGuestCount((g) => g + 1)}>
-                  <Plus className="w-3 h-3" />
-                </Button>
-                <span className="text-xs">Guests</span>
-              </div>
-            </div>
-          ) : (
-            <p className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
-              <ShoppingBag className="w-3.5 h-3.5" /> Takeout
-            </p>
-          )}
-
-          <div className="flex-1 overflow-y-auto mb-4 space-y-2">
-            {orderItems.length === 0 ? (
-              <p className={`text-center py-8 ${theme.emptyText}`}>No items</p>
-            ) : (
-              orderItems.map((item, index) => (
-                <Card key={item.id} className="border-l-4" style={{ borderLeftColor: theme.accentGold }}>
-                  <CardContent className="p-3">
-                    <div className="flex justify-between items-start mb-1">
-                      <div className="flex items-start gap-2">
-                        <span className="w-5 h-5 rounded-full bg-muted text-xs flex items-center justify-center shrink-0 mt-0.5">
-                          {index + 1}
-                        </span>
-                        <div>
-                          <p className={`font-semibold ${theme.cardHeading}`}>{item.name}</p>
-                          <p className="text-xs text-muted-foreground">{formatCurrency(item.price)}</p>
-                          {item.note && (
-                            <div className="flex items-center gap-1 mt-1">
-                              <span className="text-xs bg-accent-soft text-accent-foreground rounded-full px-2 py-0.5">{item.note}</span>
-                              <button onClick={() => startEditingNote(item.id)}>
-                                <Pencil className="w-3 h-3 text-muted-foreground" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {!item.note && (
-                          <button onClick={() => startEditingNote(item.id)} title="Add note">
-                            <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
-                          </button>
-                        )}
-                        <Button variant="ghost" size="sm" onClick={() => removeItem(item.id)} className="text-destructive hover:text-destructive/80">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" onClick={() => updateQuantity(item.id, -1)}>
-                        <Minus className="w-3 h-3" />
-                      </Button>
-                      <span className="w-8 text-center font-corp-mono">{item.quantity}</span>
-                      <Button variant="outline" size="sm" onClick={() => updateQuantity(item.id, 1)}>
-                        <Plus className="w-3 h-3" />
-                      </Button>
-                      <span className="ml-auto font-corp-mono text-sm">{formatCurrency(item.price * item.quantity)}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
-
-          {discountTypes.length > 0 && (
-            <div id="discount-chip-row" className="flex flex-wrap gap-2 mb-3">
-              {discountTypes.map((d) => (
-                <Button
-                  key={d.id}
-                  type="button"
-                  size="sm"
-                  variant={selectedDiscountId === d.id ? 'default' : 'outline'}
-                  onClick={() => toggleDiscount(d.id)}
-                  className="font-corp-body text-xs"
-                >
-                  {d.name} ({d.percentage}%)
-                </Button>
-              ))}
-            </div>
-          )}
-
-          <Button
-            type="button"
-            size="sm"
-            variant={ownerRequestConfirmed ? 'default' : 'outline'}
-            onClick={handleOpenOwnerRequest}
-            className="w-full mb-3 gap-2 font-corp-body text-xs"
-          >
-            <AlertTriangle className="w-3.5 h-3.5" />
-            {ownerRequestConfirmed ? "Owner's Request — confirmed" : "Owner's Request"}
-          </Button>
-
-          <div className="border-t-2 border-border-regular pt-4 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Subtotal</span>
-              <span className="font-corp-mono">{formatCurrency(subtotal)}</span>
-            </div>
-            {selectedDiscount && (
-              <div className="flex justify-between text-sm text-destructive">
-                <span>
-                  {selectedDiscount.name} (-{selectedDiscount.percentage}%)
-                </span>
-                <span className="font-corp-mono">-{formatCurrency(discountAmount)}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-sm">
-              <span>VAT (12%){selectedDiscount?.vat_exempt ? ' — exempt' : ''}</span>
-              <span className="font-corp-mono">{formatCurrency(tax)}</span>
-            </div>
-            <div className="flex justify-between p-2 rounded font-bold text-lg" style={{ backgroundColor: `${theme.accentGold}33` }}>
-              <span>Total</span>
-              <span className="font-corp-mono">{formatCurrency(total)}</span>
+              <Button variant="outline" size="sm" disabled={cart.length === 0} onClick={() => setEditOpen(true)}>Edit Order</Button>
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-1.5 mt-3">
-            {(['cash', 'gcash', 'card', 'split'] as PaymentMethod[]).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setPaymentMethod(m)}
-                className={`text-xs py-1.5 rounded border capitalize ${
-                  paymentMethod === m ? theme.primaryBtn + ' border-transparent' : 'bg-card border-border-regular text-foreground'
-                }`}
-              >
-                {m}
+          <div className="grid grid-cols-3 rounded-md overflow-hidden border border-border-regular mb-3">
+            {orderTypes.map(({ v, label, Icon }) => (
+              <button key={v} type="button" onClick={() => setOrderType(v)}
+                className={`flex items-center justify-center gap-1.5 py-2 text-sm ${theme.bodyFont} ${orderType === v ? theme.primaryBtn : 'bg-card text-foreground'}`}>
+                <Icon className="w-4 h-4" />{label}
               </button>
             ))}
           </div>
 
-          <Button onClick={handleCheckout} disabled={checkingOut} className={`w-full mt-4 py-6 ${theme.primaryBtn}`}>
-            {checkingOut ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <PhilippinePeso className="w-5 h-5 mr-2" />}
-            Complete Order
+          {orderType === 'dine_in' && (
+            <div className="flex items-center gap-2 mb-3">
+              <Input value={table} onChange={(e) => setTable(e.target.value)} placeholder="Table #" inputMode="numeric" aria-label="Table number" className="w-28 h-9" />
+              <div className="flex items-center gap-1 ml-auto text-sm">
+                <Button size="icon-sm" variant="outline" onClick={() => setGuests((g) => Math.max(1, g - 1))} aria-label="Fewer guests"><Minus className="w-3 h-3" /></Button>
+                <span className="w-6 text-center">{guests}</span>
+                <Button size="icon-sm" variant="outline" onClick={() => setGuests((g) => g + 1)} aria-label="More guests"><Plus className="w-3 h-3" /></Button>
+                <span className="text-xs text-muted-foreground">Guests</span>
+              </div>
+            </div>
+          )}
+
+          {orderType === 'delivery' && (
+            <div className="space-y-2 mb-3">
+              <div className="grid grid-cols-2 gap-2">
+                <Input value={dName} onChange={(e) => setDName(e.target.value)} placeholder="Customer name" />
+                <Input value={dPhone} onChange={(e) => setDPhone(e.target.value)} placeholder="Phone" inputMode="tel" />
+              </div>
+              <Input value={dAddress} onChange={(e) => setDAddress(e.target.value)} placeholder="Address" />
+              <Input value={dLandmark} onChange={(e) => setDLandmark(e.target.value)} placeholder="Landmark (optional)" />
+              <Select value={dBarangay} onValueChange={setDBarangay}>
+                <SelectTrigger><SelectValue placeholder={fees.length ? 'Barangay' : 'No delivery zones configured'} /></SelectTrigger>
+                <SelectContent className="max-h-64">{fees.map((f) => <SelectItem key={f.barangay} value={f.barangay}>{f.barangay} ({f.zone}) · {formatCurrency(f.fee)}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="flex-1 min-h-[120px] max-h-[34vh] lg:max-h-none overflow-y-auto space-y-2 mb-3">
+            {cart.length === 0 ? <p className={`text-center py-8 ${theme.emptyText}`}>No items</p> : cart.map((l, i) => (
+              <div key={l.id} className="rounded-md border border-border-regular border-l-4 p-2.5" style={{ borderLeftColor: theme.accentGold }} data-testid="cart-line">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className={`text-sm font-semibold ${theme.cardHeading}`}>{i + 1}. {l.name}</p>
+                    <p className="text-xs text-muted-foreground">{formatCurrency(l.price)}</p>
+                    {l.note && <span className="inline-block mt-1 text-xs bg-accent-soft text-accent-foreground rounded-full px-2 py-0.5">{l.note}</span>}
+                  </div>
+                  <div className="flex items-center shrink-0">
+                    <button onClick={() => { setNoteId(l.id); setNoteDraft(l.note); }} title="Add note" aria-label="Add note" className="p-1.5"><Pencil className="w-3.5 h-3.5 text-muted-foreground" /></button>
+                    <button onClick={() => removeLine(l.id)} aria-label="Remove item" className="p-1.5 text-destructive"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <Button variant="outline" size="icon-sm" onClick={() => changeQty(l.id, -1)} aria-label="Decrease"><Minus className="w-3 h-3" /></Button>
+                  <span className="w-7 text-center font-corp-mono">{l.quantity}</span>
+                  <Button variant="outline" size="icon-sm" onClick={() => changeQty(l.id, 1)} aria-label="Increase"><Plus className="w-3 h-3" /></Button>
+                  <span className="ml-auto font-corp-mono text-sm">{formatCurrency(l.price * l.quantity)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {discountTypes.length > 0 && (
+            <div id="discount-chip-row" className="flex flex-wrap gap-1.5 mb-3">
+              {discountTypes.map((d) => (
+                <Button key={d.id} type="button" size="sm" variant={discountId === d.id ? 'default' : 'outline'}
+                  onClick={() => setDiscountId((c) => (c === d.id ? null : d.id))} className="text-xs">{d.name} ({d.percentage}%)</Button>
+              ))}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <div className="grid grid-cols-2 rounded-md overflow-hidden border border-border-regular text-xs">
+              {(['vat', 'non_vat'] as VatMode[]).map((m) => (
+                <button key={m} type="button" onClick={() => setVatMode(m)} className={`py-1.5 ${vatMode === m ? theme.primaryBtn : 'bg-card'}`}>{m === 'vat' ? 'VAT' : 'Non-VAT'}</button>
+              ))}
+            </div>
+            <Button type="button" size="sm" variant={owner ? 'default' : 'outline'} className="gap-1.5 text-xs"
+              onClick={() => { setOwnerForm({ employeeNumber: '', pin: '', note: '' }); setOwnerOpen(true); }}>
+              <AlertTriangle className="w-3.5 h-3.5" />{owner ? "Owner's Request ✓" : "Owner's Request"}
+            </Button>
+          </div>
+
+          <div className="border-t-2 border-border-regular pt-3 space-y-1.5 text-sm">
+            <div className="flex justify-between"><span>Subtotal</span><span className="font-corp-mono">{formatCurrency(subtotal)}</span></div>
+            {discount && <div className="flex justify-between text-destructive"><span>{discount.name} (-{discount.percentage}%)</span><span className="font-corp-mono">-{formatCurrency(discountAmount)}</span></div>}
+            <div className="flex justify-between"><span>VAT (12%){vatExempt ? ' — exempt' : ''}</span><span className="font-corp-mono">{formatCurrency(tax)}</span></div>
+            {orderType === 'delivery' && <div className="flex justify-between"><span>Delivery fee</span><span className="font-corp-mono">{formatCurrency(deliveryFee)}</span></div>}
+            <div className="flex justify-between p-2 rounded font-bold text-lg" style={{ backgroundColor: `${theme.accentGold}33` }}>
+              <span>Total</span><span className="font-corp-mono" data-testid="pos-total">{formatCurrency(total)}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1.5 mt-3" role="group" aria-label="Payment method">
+            {(['cash', 'gcash', 'card'] as PosPayment[]).map((m) => (
+              <button key={m} type="button" onClick={() => setPayment(m)}
+                className={`text-sm py-2 rounded border capitalize ${payment === m ? `${theme.primaryBtn} border-transparent` : 'bg-card border-border-regular text-foreground'}`}>{m === 'gcash' ? 'GCash' : m}</button>
+            ))}
+          </div>
+          {payment === 'card' && (
+            <div className="grid grid-cols-2 gap-1.5 mt-1.5">
+              {(['debit', 'credit'] as const).map((t) => (
+                <button key={t} type="button" onClick={() => setCardType(t)} className={`text-xs py-1.5 rounded border capitalize ${cardType === t ? `${theme.primaryBtn} border-transparent` : 'bg-card border-border-regular'}`}>{t}</button>
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-2 mt-3">
+            <Button variant="outline" size="sm" className="gap-1.5 flex-1" onClick={() => document.getElementById('discount-chip-row')?.scrollIntoView({ behavior: 'smooth' })}>
+              <Percent className="w-3.5 h-3.5" />Discount <kbd className="text-[10px] text-muted-foreground">F3</kbd>
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5 flex-1" onClick={holdOrder}>
+              <PauseCircle className="w-3.5 h-3.5" />Hold <kbd className="text-[10px] text-muted-foreground">F4</kbd>
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5 flex-1 text-destructive" onClick={clearOrder} disabled={cart.length === 0}>
+              <X className="w-3.5 h-3.5" />Clear <kbd className="text-[10px] text-muted-foreground">Esc</kbd>
+            </Button>
+          </div>
+
+          <Button onClick={charge} disabled={charging} className={`w-full mt-3 py-6 text-base ${theme.primaryBtn}`} data-testid="pos-charge">
+            {charging ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
+            {charging ? 'Charging…' : blockers.length > 0 ? `${blockers[0]}` : `Charge ${formatCurrency(total)}`}
           </Button>
+          {dayLocked && <p className="text-xs text-center text-muted-foreground mt-2">Press "Start Business Day" to unlock the POS.</p>}
         </div>
       </div>
 
-      {/* Status Bar */}
       <div className="flex flex-wrap items-center gap-4 px-4 py-2 border-t border-border-regular bg-card text-xs text-muted-foreground">
-        <span>
-          Kitchen: {kitchenSummary ? `${kitchenSummary.queued_count} queued, ${kitchenSummary.preparing_count} preparing` : '—'}
-        </span>
-        <span>Low Stock Alerts: {availabilityCounts.low_stock + availabilityCounts.unavailable}</span>
-        <span>
-          Pending Orders:{' '}
-          {kitchenSummary ? kitchenSummary.queued_count + kitchenSummary.preparing_count + kitchenSummary.ready_count : '—'}
-        </span>
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className="ml-auto flex items-center gap-1.5 text-primary">
-              <HelpCircle className="w-3.5 h-3.5" /> Need Help?
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-72 text-sm space-y-2">
-            <p className="font-semibold flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4" /> Quick Help
-            </p>
-            <p>F3 discount · F4 hold order · F5 add note · Esc clear order.</p>
-            <p>Ask your manager for anything Malaya AI would normally answer — Malaya isn't available on employee accounts.</p>
-          </PopoverContent>
-        </Popover>
+        <span>Kitchen: {kitchen ? `${kitchen.queued_count} queued, ${kitchen.preparing_count} preparing` : '—'}</span>
+        <span>Low stock alerts: {counts.low_stock + counts.unavailable}</span>
+        <span>Pending orders: {kitchen ? kitchen.queued_count + kitchen.preparing_count + kitchen.ready_count : '—'}</span>
       </div>
 
-      {/* Note editing dialog */}
-      <Dialog open={!!editingNoteId} onOpenChange={(open) => !open && setEditingNoteId(null)}>
+      {/* Item note */}
+      <Dialog open={!!noteId} onOpenChange={(o) => !o && setNoteId(null)}>
         <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="font-corp-display">Item Note</DialogTitle>
-            <DialogDescription>e.g. "No Rice", "Extra Sauce" — visible to kitchen staff, no effect on inventory.</DialogDescription>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Item Note</DialogTitle><DialogDescription>e.g. "No rice", "Extra sauce" — shown to the kitchen.</DialogDescription></DialogHeader>
           <Input value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} placeholder="Add a note..." autoFocus />
           <div className="flex gap-3 pt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setEditingNoteId(null)}>
-              Cancel
-            </Button>
-            <Button className="flex-1" onClick={saveNote}>
-              Save
-            </Button>
+            <Button variant="outline" className="flex-1" onClick={() => setNoteId(null)}>Cancel</Button>
+            <Button className="flex-1" onClick={() => { setCart((c) => c.map((l) => (l.id === noteId ? { ...l, note: noteDraft.trim() } : l))); setNoteId(null); }}>Save</Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Owner's Request Dialog */}
-      <Dialog open={ownerRequestOpen} onOpenChange={setOwnerRequestOpen}>
+      {/* Edit order: quick review of all lines and notes */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Edit Order</DialogTitle><DialogDescription>Adjust quantities and kitchen notes before charging.</DialogDescription></DialogHeader>
+          <div className="space-y-3">
+            {cart.map((l) => (
+              <div key={l.id} className="space-y-1.5 border-b border-border-regular pb-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex-1 text-sm font-medium">{l.name}</span>
+                  <Button variant="outline" size="icon-sm" onClick={() => changeQty(l.id, -1)} aria-label="Decrease"><Minus className="w-3 h-3" /></Button>
+                  <span className="w-6 text-center font-corp-mono">{l.quantity}</span>
+                  <Button variant="outline" size="icon-sm" onClick={() => changeQty(l.id, 1)} aria-label="Increase"><Plus className="w-3 h-3" /></Button>
+                </div>
+                <Input value={l.note} onChange={(e) => setCart((c) => c.map((x) => (x.id === l.id ? { ...x, note: e.target.value } : x)))} placeholder="Note for the kitchen" className="h-8 text-sm" />
+              </div>
+            ))}
+            {cart.length === 0 && <p className="text-sm text-muted-foreground">The order is empty.</p>}
+          </div>
+          <Button onClick={() => setEditOpen(false)}>Done</Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Owner's request */}
+      <Dialog open={ownerOpen} onOpenChange={setOwnerOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-corp-display flex items-center gap-2 text-warning">
-              <AlertTriangle className="w-5 h-5" />
-              Owner's Request Warning
-            </DialogTitle>
-            <DialogDescription className="font-corp-body">
-              This order will be logged as the owner's personal consumption. It will be
-              excluded from sales revenue. Enter your own employee number and PIN to confirm —
-              if this is a fraudulent access, it will be traced back to you.
-            </DialogDescription>
+            <DialogTitle className="flex items-center gap-2"><AlertTriangle className="w-5 h-5" />Owner's Request</DialogTitle>
+            <DialogDescription>Logged as personal consumption and excluded from sales revenue. Confirm with your own employee number and PIN.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground font-corp-body">Employee Number</label>
-              <Input
-                value={ownerRequestForm.employeeNumber}
-                onChange={(e) => setOwnerRequestForm({ ...ownerRequestForm, employeeNumber: e.target.value })}
-                placeholder="EMP-XXXX-XXXX"
-                className="font-corp-body font-corp-mono"
-              />
+          <div className="space-y-3">
+            <Input value={ownerForm.employeeNumber} onChange={(e) => setOwnerForm({ ...ownerForm, employeeNumber: e.target.value })} placeholder="Employee number" className="font-corp-mono" />
+            <Input type="password" value={ownerForm.pin} onChange={(e) => setOwnerForm({ ...ownerForm, pin: e.target.value })} placeholder="PIN" className="font-corp-mono" />
+            <Input value={ownerForm.note} onChange={(e) => setOwnerForm({ ...ownerForm, note: e.target.value })} placeholder="Occasion / notes (optional)" />
+            <div className="flex gap-3 pt-1">
+              <Button variant="outline" className="flex-1" onClick={() => setOwnerOpen(false)}>Cancel</Button>
+              <Button className="flex-1" onClick={() => {
+                if (!ownerForm.employeeNumber || !ownerForm.pin) return void toast.error('Enter your employee number and PIN');
+                setOwner({ ...ownerForm }); setOwnerOpen(false);
+              }}>Confirm</Button>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground font-corp-body">PIN</label>
-              <Input
-                type="password"
-                value={ownerRequestForm.pin}
-                onChange={(e) => setOwnerRequestForm({ ...ownerRequestForm, pin: e.target.value })}
-                placeholder="****"
-                className="font-corp-body font-corp-mono"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground font-corp-body">Occasion / Notes (optional)</label>
-              <Input
-                value={ownerRequestForm.note}
-                onChange={(e) => setOwnerRequestForm({ ...ownerRequestForm, note: e.target.value })}
-                placeholder="Optional context for this order"
-                className="font-corp-body"
-              />
-            </div>
-            <div className="flex gap-3 pt-2">
-              <Button type="button" variant="outline" onClick={() => setOwnerRequestOpen(false)} className="flex-1">
-                Cancel
-              </Button>
-              <Button type="button" onClick={handleConfirmOwnerRequest} className="flex-1">
-                Confirm
-              </Button>
-            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Start business day */}
+      <Dialog open={dayOpen} onOpenChange={setDayOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Start Business Day</DialogTitle><DialogDescription>Confirm with your employee number and PIN. Confirm today's menu availability first.</DialogDescription></DialogHeader>
+          <div className="space-y-3">
+            <Input value={dayForm.employeeNumber} onChange={(e) => setDayForm({ ...dayForm, employeeNumber: e.target.value })} placeholder="Employee number" className="font-corp-mono" />
+            <Input type="password" value={dayForm.pin} onChange={(e) => setDayForm({ ...dayForm, pin: e.target.value })} placeholder="PIN" className="font-corp-mono" />
+            <Button className="w-full" onClick={submitDay} disabled={dayBusy}>{dayBusy ? 'Starting…' : 'Start day'}</Button>
           </div>
         </DialogContent>
       </Dialog>

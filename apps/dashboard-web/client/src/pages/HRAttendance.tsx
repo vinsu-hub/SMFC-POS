@@ -29,7 +29,7 @@ import {
   fetchBranches,
 } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import { BRANCH_CONFIG } from '@/lib/types';
+import { BRANCH_CONFIG, isExecutiveLike, isManagerPlus } from '@/lib/types';
 
 const STATUS_COLORS: Record<string, string> = {
   working: 'bg-primary text-primary-foreground',
@@ -78,7 +78,7 @@ export default function HRAttendance() {
   // they pick one from the same real-location allow-list used elsewhere
   // (e.g. POS Management) - without this, Employee Management/Payroll here
   // silently show nothing for executives since user.branchId is null.
-  const isExecutive = user?.role === 'executive';
+  const isExecutive = isExecutiveLike(user?.role);
   const [branches, setBranches] = useState<ApiBranch[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
 
@@ -100,7 +100,7 @@ export default function HRAttendance() {
   }, [user?.id, user?.branchId]);
 
   useEffect(() => {
-    if (!activeBranchId || (user?.role !== 'manager' && user?.role !== 'executive')) return;
+    if (!activeBranchId || !isManagerPlus(user?.role)) return;
     loadBranchData();
   }, [activeBranchId, user?.role]);
 
@@ -153,7 +153,7 @@ export default function HRAttendance() {
       await clockOut({ employee_id: user.id });
       toast.success('Clocked out successfully');
       loadMyAttendance();
-      if (user.role === 'manager' || user.role === 'executive') {
+      if (isManagerPlus(user?.role)) {
         loadBranchData();
       }
     } catch (error) {
@@ -324,7 +324,7 @@ export default function HRAttendance() {
         )}
 
         {/* Manager/Executive Views */}
-        {(user?.role === 'manager' || user?.role === 'executive') && (
+        {isManagerPlus(user?.role) && (
           <>
             {/* Payroll Period Selector */}
             <Card>

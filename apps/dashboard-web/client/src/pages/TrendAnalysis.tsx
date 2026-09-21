@@ -1,4 +1,5 @@
 import React from 'react';
+import { isExecutiveLike } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +9,7 @@ import { TrendingUp, TrendingDown, Zap } from 'lucide-react';
 export default function TrendAnalysis() {
   const { user } = useAuth();
 
-  if (!user || user.role !== 'executive') {
+  if (!user || !isExecutiveLike(user?.role)) {
     return (
       <DashboardLayout>
         <div className="p-6 text-center">

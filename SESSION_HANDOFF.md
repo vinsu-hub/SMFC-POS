@@ -286,3 +286,12 @@ Full list of all 12 locations' theme keys is in `apps/dashboard-web/client/src/l
 - [x] Payroll Settings page renders — Employee Pay Rates works today (no migration needed), engine toggle correctly locked to executive-only for a manager login, fails gracefully on the still-missing `hr.payroll_rule_settings` table
 - [ ] `pytest tests/test_payroll_engine.py` — **not yet run**, needs migrations `0022`–`0028` applied first
 - [ ] End-to-end: flip `engine_enabled` on, generate payroll for a period with a seeded holiday, confirm payslip PDF shows the breakdown and totals match manual DOLE-table math — **not yet done**, needs migrations applied
+
+## 2026-09-21 (later): Finance all-access, PO history, Oishii-style POS
+- Migration `0046` (applied): finance_admin is executive-like (`is_manager_plus`, `can_see_branch`, POS branch override, void/kitchen), plus opt-in `business_settings.require_business_day` (default off).
+- Backend: `is_executive_like` / `is_manager_plus` / `is_company_wide` in `app/auth.py`; routers use them.
+- Finance page tabs: Purchase Orders, PO History (filters, CSV, detail), Spend Overview, Receipts, Unit Price History, Suppliers. Finance signs only the finance slot.
+- POS terminal rewritten (`pages/POSTerminal.tsx`, `lib/posApi.ts`): text-only cards, Dine In/Takeout/Delivery, numeric table input (no floor plan), Held/Edit Order, discount chips, VAT/Non-VAT, required payment method, F3/F4/Esc, pagination, availability counts, branch picker for executive/finance, Start Business Day (only when the flag is on). Sales go through the `create_pos_transaction` RPC.
+- Delivery needs rows in `delivery_fees` (currently empty) before delivery orders can be charged.
+- Tested locally against the shared DB: 42/42 Playwright checks (`pos_finance_check.mjs`); pytest 39/40 (the one failure is `test_malaya` needing GROQ_API_KEY).
+- Vercel preview (not production): https://smfc-74ukfx19y-varix1.vercel.app (behind Vercel login). Production aliases NOT updated.

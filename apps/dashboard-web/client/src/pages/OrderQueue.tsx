@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { isManagerPlus } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -169,7 +170,7 @@ export default function OrderQueue() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transactions, statusFilter, searchQuery, sortOrder, products]);
 
-  if (!user || (user.role !== 'employee' && user.role !== 'manager' && user.role !== 'executive') || !user.branchId) {
+  if (!user || (user.role !== 'employee' && !isManagerPlus(user?.role)) || !user.branchId) {
     return (
       <DashboardLayout>
         <div className="p-6 text-center">

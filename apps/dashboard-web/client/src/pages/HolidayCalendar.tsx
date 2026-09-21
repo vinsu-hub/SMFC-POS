@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { isExecutiveLike } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -34,7 +35,7 @@ const HOLIDAY_TYPE_BADGE: Record<ApiHoliday['holiday_type'], string> = {
 
 export default function HolidayCalendar() {
   const { user } = useAuth();
-  const isExecutive = user?.role === 'executive';
+  const isExecutive = isExecutiveLike(user?.role);
   const [year, setYear] = useState(new Date().getFullYear());
   const [holidays, setHolidays] = useState<ApiHoliday[]>([]);
   const [auditLog, setAuditLog] = useState<ApiPayrollAuditLogEntry[]>([]);

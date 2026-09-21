@@ -83,7 +83,7 @@ export default function Logistics() {
       .catch(() => toast.error('Could not load that branch\'s inventory'));
   }, [fromBranch]);
 
-  if (!user || user.role !== 'logistics') {
+  if (!user || !['logistics', 'finance_admin', 'executive'].includes(user.role)) {
     return (
       <DashboardLayout>
         <p className="p-6 text-center text-destructive">Access denied. Logistics only.</p>

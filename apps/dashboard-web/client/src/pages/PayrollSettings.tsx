@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertTriangle, Loader2, Save, Upload } from 'lucide-react';
 import { toast } from 'sonner';
-import { BRANCH_CONFIG } from '@/lib/types';
+import { BRANCH_CONFIG, isExecutiveLike } from '@/lib/types';
 import {
   ApiPayMultiplierRule,
   ApiBranch,
@@ -38,7 +38,7 @@ const SCENARIO_LABEL: Record<PayMultiplierScenario, string> = {
 
 export default function PayrollSettings() {
   const { user } = useAuth();
-  const isExecutive = user?.role === 'executive';
+  const isExecutive = isExecutiveLike(user?.role);
   const [rules, setRules] = useState<ApiPayMultiplierRule[]>([]);
   const [engineEnabled, setEngineEnabled] = useState(false);
   const [loading, setLoading] = useState(true);

@@ -56,11 +56,13 @@ export default function Procurement() {
   };
   useEffect(() => { void load(); }, []);
 
-  if (!user || user.role !== 'procurement') {
+  if (!user || !['procurement', 'finance_admin'].includes(user.role)) {
     return (
-      <DashboardLayout><p className="p-6 text-center text-red-600">Access denied. Procurement only.</p></DashboardLayout>
+      <DashboardLayout><p className="p-6 text-center text-red-600">Access denied.</p></DashboardLayout>
     );
   }
+  // finance admin sees everything here, but the procurement steps stay with the procurement head (separation of duties)
+  const canAct = user.role === 'procurement';
 
   const run = async (fn: () => PromiseLike<{ error: { message: string } | null }>, ok: string) => {
     setBusy(true);
@@ -94,7 +96,7 @@ export default function Procurement() {
           </TabsList>
 
           <TabsContent value="inbox" className="space-y-4">
-            <Card className="min-w-0">
+            {canAct && <Card className="min-w-0">
               <CardContent className="p-4 flex flex-wrap gap-3 items-center">
                 <span className="text-sm text-gray-600">Send selected items for canvassing to</span>
                 <Select value={canvasser} onValueChange={setCanvasser}>
@@ -109,7 +111,7 @@ export default function Procurement() {
                 </Button>
                 <span className="text-xs text-gray-500">Same item + unit from different branches is merged into one ticket.</span>
               </CardContent>
-            </Card>
+            </Card>}
             {!loading && inbox.length === 0 && <p className="px-4 py-8 text-center text-sm text-muted-foreground">No new requests.</p>}
             {inbox.map((r) => (
               <Card className="min-w-0" key={r.id}>
@@ -123,7 +125,7 @@ export default function Procurement() {
                   {r.notes && <p className="text-xs text-gray-500 mb-1">Note: {r.notes}</p>}
                   {r.purchase_request_items.filter((i) => !i.ticket_id).map((i) => (
                     <label key={i.id} className="flex min-h-9 items-center gap-2 text-sm cursor-pointer">
-                      <input type="checkbox" checked={checked.has(i.id)} onChange={() => toggle(i.id)} />
+                      {canAct && <input type="checkbox" checked={checked.has(i.id)} onChange={() => toggle(i.id)} />}
                       {i.quantity} {i.unit} — {i.item_name}
                     </label>
                   ))}
@@ -161,7 +163,7 @@ export default function Procurement() {
                             <TableCell className="text-right font-corp-mono">{peso(q.unit_cost * t.total_quantity)}</TableCell>
                             <TableCell className="text-right">
                               {q.selected ? <Badge className="bg-green-100 text-green-800">Selected</Badge>
-                                : !['ordered'].includes(t.status) && (
+                                : canAct && !['ordered'].includes(t.status) && (
                                   <Button size="sm" className="min-h-9" variant="outline" disabled={busy}
                                     onClick={() => run(() => supabase.rpc('select_quote', { p_quote_id: q.id }), 'Quote selected')}>Select</Button>)}
                             </TableCell>
@@ -176,10 +178,10 @@ export default function Procurement() {
           </TabsContent>
 
           <TabsContent value="po" className="space-y-4">
-            <Button disabled={busy || selectedTickets.length === 0} className="h-auto min-h-9 whitespace-normal "
+            {canAct && <Button disabled={busy || selectedTickets.length === 0} className="h-auto min-h-9 whitespace-normal "
               onClick={() => run(() => supabase.rpc('compile_purchase_orders', { p_ticket_ids: null }), 'Purchase orders compiled')}>
               Compile purchase orders ({selectedTickets.length} item{selectedTickets.length === 1 ? '' : 's'} ready)
-            </Button>
+            </Button>}
             <Card className="min-w-0"><CardContent className="p-0">
               <Table>
                 <TableHeader><TableRow>
@@ -200,7 +202,7 @@ export default function Procurement() {
                         Procurement: {p.procurement_signed_at ? '✓' : '—'}<br />Finance: {p.finance_signed_at ? '✓' : '—'}
                       </TableCell>
                       <TableCell className="space-x-2 text-right whitespace-nowrap">
-                        {p.status === 'awaiting_signatures' && !p.procurement_signed_at && (
+                        {canAct && p.status === 'awaiting_signatures' && !p.procurement_signed_at && (
                           <Button size="sm" className="min-h-9" disabled={busy} onClick={() => run(() => supabase.rpc('sign_purchase_order', { p_po_id: p.id }), 'Signed')}>Sign</Button>)}
                         <Button size="sm" className="min-h-9" variant="outline" onClick={() => { printPurchaseOrder(p); supabase.rpc('mark_po_printed', { p_po_id: p.id }).then(() => load()); }}>Print</Button>
                       </TableCell>

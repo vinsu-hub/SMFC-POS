@@ -48,7 +48,7 @@ export default function RequestStock() {
   };
   useEffect(() => { void load(); }, [user?.branchId]);
 
-  if (!user || !['employee', 'manager'].includes(user.role)) {
+  if (!user || !['employee', 'manager', 'finance_admin'].includes(user.role)) {
     return (
       <DashboardLayout>
         <p className="p-6 text-center text-red-600">Access denied.</p>

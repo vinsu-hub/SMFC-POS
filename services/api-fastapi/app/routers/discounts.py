@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.auth import CurrentUser, get_current_user, require_branch_access
+from app.auth import CurrentUser, get_current_user, is_manager_plus, require_branch_access
 from app.deps import get_supabase
 from app.schemas import DiscountType, DiscountTypeCreate, DiscountTypeUpdate
 
@@ -30,7 +30,7 @@ def list_discount_types(
 def create_discount_type(
     body: DiscountTypeCreate, user: CurrentUser = Depends(get_current_user)
 ):
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
     require_branch_access(user, body.branch_id)
 
@@ -56,7 +56,7 @@ def update_discount_type(
     body: DiscountTypeUpdate,
     user: CurrentUser = Depends(get_current_user),
 ):
-    if user.role not in ("manager", "executive"):
+    if not is_manager_plus(user):
         raise HTTPException(status_code=403, detail="Manager or Executive access required")
 
     supabase = get_supabase()

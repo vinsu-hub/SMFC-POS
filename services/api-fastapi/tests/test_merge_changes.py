@@ -3,7 +3,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
-from app.auth import CurrentUser, is_company_wide
+from app.auth import CurrentUser, is_company_wide, is_executive_like, is_manager_plus
 from app.deps import get_supabase
 
 
@@ -11,11 +11,18 @@ def _user(role: str) -> CurrentUser:
     return CurrentUser(id="u", role=role, branch_id=None)
 
 
-def test_company_wide_roles_are_executive_and_logistics_only():
-    assert is_company_wide(_user("executive"))
-    assert is_company_wide(_user("logistics"))
-    for role in ("employee", "manager", "procurement", "finance_admin", "canvasser"):
+def test_company_wide_roles_are_executive_like_and_logistics_only():
+    for role in ("executive", "finance_admin", "logistics"):
+        assert is_company_wide(_user(role)), role
+    for role in ("employee", "manager", "procurement", "canvasser"):
         assert not is_company_wide(_user(role)), role
+
+
+def test_finance_admin_is_executive_like_and_manager_plus():
+    assert is_executive_like(_user("finance_admin")) and is_executive_like(_user("executive"))
+    assert not is_executive_like(_user("manager"))
+    assert is_manager_plus(_user("finance_admin")) and is_manager_plus(_user("manager"))
+    assert not is_manager_plus(_user("employee")) and not is_manager_plus(_user("procurement"))
 
 
 def test_electricity_reading_can_be_saved_and_updated_the_same_day(client, matcha_latte_scenario):

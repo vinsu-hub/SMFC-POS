@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from datetime import date
 
-from app.auth import CurrentUser, get_current_user, require_branch_access
+from app.auth import CurrentUser, get_current_user, is_executive_like, require_branch_access
 from app.deps import get_supabase
 from app.schemas import (
     UtilityLogCreate,
@@ -81,7 +81,7 @@ def create_utility_log(
 ):
     """Record a utility meter reading (start or end of business day)."""
     require_branch_access(user, body.branch_id)
-    if body.recorded_by != user.id and user.role != "executive":
+    if body.recorded_by != user.id and not is_executive_like(user):
         raise HTTPException(status_code=403, detail="Cannot log for another employee")
 
     supabase = get_supabase()
@@ -192,7 +192,7 @@ def get_org_utility_summary(
     user: CurrentUser = Depends(get_current_user),
 ):
     """Executive view: utility summary across all branches."""
-    if user.role != "executive":
+    if not is_executive_like(user):
         raise HTTPException(status_code=403, detail="Executive access required")
 
     supabase = get_supabase()

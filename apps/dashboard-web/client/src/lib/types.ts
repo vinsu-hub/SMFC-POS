@@ -34,6 +34,11 @@ export type Role =
   | 'canvasser'
   | 'logistics';
 
+/** Executives and finance admins have executive-level access to every feature. */
+export const isExecutiveLike = (role?: Role | null): boolean => role === 'executive' || role === 'finance_admin';
+/** Manager or any executive-level role. */
+export const isManagerPlus = (role?: Role | null): boolean => role === 'manager' || isExecutiveLike(role);
+
 export interface User {
   id: string;
   branchId: string | null;

@@ -56,8 +56,22 @@ def get_current_user(
     )
 
 
+# Executives and finance admins have executive-level access to everything (finance signs only the
+# finance slot of a purchase order; that stays enforced in the database function).
+EXECUTIVE_LIKE_ROLES = frozenset({"executive", "finance_admin"})
+MANAGER_PLUS_ROLES = frozenset({"manager"}) | EXECUTIVE_LIKE_ROLES
 # Roles that operate across every branch instead of being scoped to one.
-COMPANY_WIDE_ROLES = frozenset({"executive", "logistics"})
+COMPANY_WIDE_ROLES = EXECUTIVE_LIKE_ROLES | {"logistics"}
+
+
+def is_executive_like(user: "CurrentUser") -> bool:
+    return user.role in EXECUTIVE_LIKE_ROLES
+
+
+def is_manager_plus(user: "CurrentUser") -> bool:
+    """Manager or any executive-level role."""
+    return user.role in MANAGER_PLUS_ROLES
+
 
 
 def is_company_wide(user: CurrentUser) -> bool:
