@@ -73,7 +73,6 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
       : []),
     ...(isManager
       ? [
-          { icon: BarChart3, label: 'EOD Dashboard', href: '/dashboard', show: true },
           { icon: ShoppingCart, label: 'POS Terminal', href: '/pos', show: true },
           { icon: ListOrdered, label: 'Order Queue', href: '/order-queue', show: true },
           { icon: ChefHat, label: 'Kitchen Display', href: '/kitchen-display', show: true },
@@ -83,10 +82,6 @@ export function Sidebar({ collapsed, onToggleCollapse, mobileOpen, onCloseMobile
           { icon: Truck, label: 'Inventory Movements', href: '/inventory-movements', show: true },
           { icon: Zap, label: 'Utility Log', href: '/utility-log', show: true },
           { icon: ClipboardList, label: 'Request Stock', href: '/request-stock', show: true },
-          { icon: Users, label: 'HR Management', href: '/hr/attendance', show: true },
-          { icon: Wallet, label: 'Payroll', href: '/hr/payroll', show: true },
-          { icon: CalendarDays, label: 'Holiday Calendar', href: '/hr/holiday-calendar', show: true },
-          { icon: Sparkles, label: 'Malaya AI', href: '/malaya', show: true },
           { icon: MessageSquare, label: 'Newsfeed', href: '/newsfeed', show: true },
         ]
       : []),

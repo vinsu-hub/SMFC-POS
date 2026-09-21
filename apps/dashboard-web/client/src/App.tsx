@@ -1,5 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import React from "react";
+import { useAuth } from "./contexts/AuthContext";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -35,6 +37,20 @@ import FinanceApprovals from "./pages/FinanceApprovals";
 import RequestStock from "./pages/RequestStock";
 import Logistics from "./pages/Logistics";
 
+
+/** Routes managers may not open (EOD dashboard, HR, payroll, holiday calendar, Malaya AI). */
+function NoManager({ component: Page }: { component: React.ComponentType }) {
+  const { user } = useAuth();
+  if (user?.role === 'manager') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 text-center">
+        <p className="text-destructive">Access denied. This page is not available to managers.</p>
+      </div>
+    );
+  }
+  return <Page />;
+}
+
 function Router() {
   return (
     <Switch>
@@ -44,20 +60,20 @@ function Router() {
       <Route path={"/order-queue"} component={OrderQueue} />
       <Route path={"/kitchen-display"} component={KitchenDisplay} />
       <Route path={"/pos-management"} component={POSManagement} />
-      <Route path={"/dashboard"} component={ManagerDashboard} />
+      <Route path={"/dashboard"}>{() => <NoManager component={ManagerDashboard} />}</Route>
       <Route path={"/command-center"} component={CommandCenter} />
       <Route path={"/trends"} component={TrendAnalysis} />
-      <Route path={"/malaya"} component={MalayaChat} />
-      <Route path={"/hr-flags"} component={HRFlags} />
+      <Route path={"/malaya"}>{() => <NoManager component={MalayaChat} />}</Route>
+      <Route path={"/hr-flags"}>{() => <NoManager component={HRFlags} />}</Route>
       <Route path={"/newsfeed"} component={Newsfeed} />
       <Route path={"/inventory-count"} component={InventoryCount} />
       <Route path={"/loss-log"} component={LossLog} />
       <Route path={"/inventory-movements"} component={InventoryMovements} />
       <Route path={"/utility-log"} component={UtilityLog} />
-      <Route path={"/hr/attendance"} component={HRAttendance} />
-      <Route path={"/hr/payroll"} component={HRPayroll} />
-      <Route path={"/hr/holiday-calendar"} component={HolidayCalendar} />
-      <Route path={"/hr/payroll-settings"} component={PayrollSettings} />
+      <Route path={"/hr/attendance"}>{() => <NoManager component={HRAttendance} />}</Route>
+      <Route path={"/hr/payroll"}>{() => <NoManager component={HRPayroll} />}</Route>
+      <Route path={"/hr/holiday-calendar"}>{() => <NoManager component={HolidayCalendar} />}</Route>
+      <Route path={"/hr/payroll-settings"}>{() => <NoManager component={PayrollSettings} />}</Route>
       <Route path={"/settings"} component={Settings} />
       <Route path={"/request-stock"} component={RequestStock} />
       <Route path={"/procurement"} component={Procurement} />

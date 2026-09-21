@@ -18,7 +18,7 @@ export default function Home() {
     if (user?.role === 'employee') {
       navigate('/pos');
     } else if (user?.role === 'manager') {
-      navigate('/dashboard');
+      navigate('/pos');
     } else if (user?.role === 'executive') {
       navigate('/command-center');
     } else if (user?.role === 'procurement') {

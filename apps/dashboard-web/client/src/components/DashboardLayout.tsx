@@ -61,7 +61,7 @@ export function DashboardLayout({ children, title }: DashboardLayoutProps) {
           {children}
         </main>
       </div>
-      {(user?.role === 'manager' || user?.role === 'executive') && <MalayaPanelDrawer />}
+      {user?.role === 'executive' && <MalayaPanelDrawer />}
     </div>
   );
 }
